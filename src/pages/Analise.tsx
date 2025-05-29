@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +5,7 @@ import { BarChart3, TrendingUp, PieChart, Calendar, DollarSign } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart as RechartsPieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart as RechartsPieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
 import MonthSelector from "@/components/MonthSelector";
 import Auth from "@/components/Auth";
 
@@ -200,6 +199,14 @@ const Analise = () => {
     lucro: { label: "Lucro", color: "#f97316" }
   };
 
+  const categoryChartConfig = categoryData.reduce((config, item, index) => {
+    config[item.name] = {
+      label: item.name,
+      color: COLORS[index % COLORS.length]
+    };
+    return config;
+  }, {} as any);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -314,18 +321,16 @@ const Analise = () => {
             <CardContent>
               {categoryData.length > 0 ? (
                 <>
-                  <div className="h-[400px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Pie data={categoryData} cx="50%" cy="50%" outerRadius={120} dataKey="value">
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <ChartContainer config={categoryChartConfig} className="h-[400px]">
+                    <RechartsPieChart>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Pie data={categoryData} cx="50%" cy="50%" outerRadius={120} dataKey="value">
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </RechartsPieChart>
+                  </ChartContainer>
                   <div className="grid grid-cols-2 gap-4 mt-4">
                     {categoryData.map((item, index) => (
                       <div key={item.name} className="flex items-center gap-2">
