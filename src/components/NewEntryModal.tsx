@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
 interface NewEntryModalProps {
@@ -24,6 +24,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
   
@@ -45,8 +46,37 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     enabled: isOpen
   });
 
-  // Categorias padrão + categorias do usuário
+  // Busca as categorias do CategoryManager
+  const { data: categoriesFromManager = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      
+      // Primeiro busca as categorias locais do CategoryManager
+      const localCategories = queryClient.getQueryData(['categories', user.id]) as string[] || [];
+      
+      // Depois busca as categorias do banco
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('category')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      const dbCategories = [...new Set(data.map(item => item.category))];
+      
+      // Combina todas as categorias
+      return [...new Set([...localCategories, ...dbCategories])];
+    },
+    enabled: isOpen
+  });
+
+  // Categorias padrão predefinidas
   const defaultCategories = [
+    'Comida',
+    'Escritório', 
+    'Lazer e ócio',
+    'Carro',
     'Alimentação',
     'Transporte',
     'Moradia',
@@ -62,7 +92,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     'Outros'
   ];
 
-  const allCategories = [...new Set([...defaultCategories, ...userCategories])].sort();
+  // Combina todas as categorias disponíveis
+  const allCategories = [...new Set([...defaultCategories, ...userCategories, ...categoriesFromManager])].sort();
 
   const types = [
     { value: 'entrada', label: 'Entrada' },
@@ -96,6 +127,10 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         title: "Lançamento criado!",
         description: "O lançamento foi adicionado com sucesso.",
       });
+
+      // Invalida as queries para atualizar as listas
+      queryClient.invalidateQueries({ queryKey: ['user-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
 
       setFormData({
         date: new Date().toISOString().split('T')[0],
@@ -184,7 +219,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white z-50">
                   {allCategories.map(category => (
                     <SelectItem key={category} value={category}>
                       {category}

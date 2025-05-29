@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -27,8 +27,8 @@ interface CategoryManagerProps {
 const CategoryManager = ({ userId }: CategoryManagerProps) => {
   const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ old: string; new: string } | null>(null);
-  const [localCategories, setLocalCategories] = useState<string[]>([]);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: dbCategories = [], refetch } = useQuery({
     queryKey: ['categories', userId],
@@ -44,8 +44,29 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
     enabled: !!userId
   });
 
-  // Combina categorias do banco com categorias locais
-  const allCategories = [...new Set([...dbCategories, ...localCategories])];
+  // Categorias padrão predefinidas (mesmas do NewEntryModal)
+  const defaultCategories = [
+    'Comida',
+    'Escritório', 
+    'Lazer e ócio',
+    'Carro',
+    'Alimentação',
+    'Transporte',
+    'Moradia',
+    'Saúde',
+    'Educação',
+    'Lazer',
+    'Vestuário',
+    'Tecnologia',
+    'Investimentos',
+    'Salário',
+    'Freelance',
+    'Vendas',
+    'Outros'
+  ];
+
+  // Combina categorias padrão com categorias do banco
+  const allCategories = [...new Set([...defaultCategories, ...dbCategories])].sort();
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
@@ -59,8 +80,16 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
       return;
     }
 
-    // Adiciona a categoria localmente para aparecer imediatamente
-    setLocalCategories(prev => [...prev, newCategory]);
+    // Atualiza a cache local para mostrar a categoria imediatamente
+    queryClient.setQueryData(['categories', userId], (oldData: string[] = []) => {
+      return [...new Set([...oldData, newCategory])];
+    });
+
+    // Também atualiza a cache de user-categories para o NewEntryModal
+    queryClient.setQueryData(['user-categories'], (oldData: string[] = []) => {
+      return [...new Set([...oldData, newCategory])];
+    });
+
     setNewCategory("");
     
     toast({
@@ -85,50 +114,50 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
         variant: "destructive",
       });
     } else {
-      // Atualiza também as categorias locais se necessário
-      setLocalCategories(prev => 
-        prev.map(cat => cat === editingCategory.old ? editingCategory.new : cat)
-      );
-      
       toast({
         title: "Sucesso",
         description: "Categoria editada com sucesso",
       });
       setEditingCategory(null);
       refetch();
+      // Invalida as queries para atualizar em todos os lugares
+      queryClient.invalidateQueries({ queryKey: ['user-categories'] });
     }
   };
 
   const handleDeleteCategory = async (category: string) => {
-    // Se é uma categoria local (não tem lançamentos), remove apenas localmente
-    if (!dbCategories.includes(category)) {
-      setLocalCategories(prev => prev.filter(cat => cat !== category));
+    // Se é uma categoria padrão, não permite deletar
+    if (defaultCategories.includes(category)) {
       toast({
-        title: "Sucesso",
-        description: "Categoria removida",
+        title: "Erro",
+        description: "Não é possível excluir categorias padrão",
+        variant: "destructive",
       });
       return;
     }
 
     // Se tem lançamentos, deleta do banco
-    const { error } = await supabase
-      .from('financial_items')
-      .delete()
-      .eq('user_id', userId)
-      .eq('category', category);
-    
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir categoria",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Categoria e seus lançamentos excluídos com sucesso",
-      });
-      refetch();
+    if (dbCategories.includes(category)) {
+      const { error } = await supabase
+        .from('financial_items')
+        .delete()
+        .eq('user_id', userId)
+        .eq('category', category);
+      
+      if (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir categoria",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sucesso",
+          description: "Categoria e seus lançamentos excluídos com sucesso",
+        });
+        refetch();
+        queryClient.invalidateQueries({ queryKey: ['user-categories'] });
+      }
     }
   };
 
@@ -170,42 +199,49 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
                 <>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{category}</Badge>
-                    {!dbCategories.includes(category) && (
+                    {defaultCategories.includes(category) && (
+                      <Badge variant="secondary" className="text-xs">Padrão</Badge>
+                    )}
+                    {!dbCategories.includes(category) && !defaultCategories.includes(category) && (
                       <Badge variant="secondary" className="text-xs">Nova</Badge>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingCategory({ old: category, new: category })}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="text-red-600">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Excluir Categoria</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {dbCategories.includes(category) 
-                              ? `Isso excluirá a categoria "${category}" e TODOS os lançamentos associados a ela. Esta ação não pode ser desfeita.`
-                              : `Isso excluirá a categoria "${category}". Esta ação não pode ser desfeita.`
-                            }
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteCategory(category)}>
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    {!defaultCategories.includes(category) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingCategory({ old: category, new: category })}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {!defaultCategories.includes(category) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" className="text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir Categoria</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {dbCategories.includes(category) 
+                                ? `Isso excluirá a categoria "${category}" e TODOS os lançamentos associados a ela. Esta ação não pode ser desfeita.`
+                                : `Isso excluirá a categoria "${category}". Esta ação não pode ser desfeita.`
+                              }
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteCategory(category)}>
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </>
               )}
