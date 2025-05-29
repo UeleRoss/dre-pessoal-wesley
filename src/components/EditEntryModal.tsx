@@ -61,8 +61,12 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       .eq('user_id', userId);
 
     if (!error && data) {
-      setBanks([...new Set(data.map(item => item.bank))]);
-      setCategories([...new Set(data.map(item => item.category))]);
+      // Filter out empty strings and null/undefined values
+      const uniqueBanks = [...new Set(data.map(item => item.bank))].filter(bank => bank && bank.trim() !== '');
+      const uniqueCategories = [...new Set(data.map(item => item.category))].filter(category => category && category.trim() !== '');
+      
+      setBanks(uniqueBanks);
+      setCategories(uniqueCategories);
     }
   };
 
