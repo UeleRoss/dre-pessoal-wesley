@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Filter, Download, Edit, Trash2, Search, Settings } from "lucide-react";
+import { Plus, Filter, Download, Edit, Trash2, Search, Settings, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,8 @@ const Lancamentos = () => {
   const [isEditEntryModalOpen, setIsEditEntryModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<string>("");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -73,18 +75,45 @@ const Lancamentos = () => {
   const uniqueBanks = [...new Set(financialItems.map(item => item.bank))];
   const uniqueCategories = [...new Set(financialItems.map(item => item.category))];
 
-  // Filter items based on search and filters
-  const filteredItems = financialItems.filter(item => {
-    const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.bank.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesBank = selectedBank === "all" || item.bank === selectedBank;
-    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
-    const matchesType = selectedType === "all" || item.type === selectedType;
-    
-    return matchesSearch && matchesBank && matchesCategory && matchesType;
-  });
+  // Filter and sort items
+  const filteredAndSortedItems = financialItems
+    .filter(item => {
+      const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           item.bank.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesBank = selectedBank === "all" || item.bank === selectedBank;
+      const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
+      const matchesType = selectedType === "all" || item.type === selectedType;
+      
+      return matchesSearch && matchesBank && matchesCategory && matchesType;
+    })
+    .sort((a, b) => {
+      if (!sortField) return 0;
+      
+      let aValue: any = a[sortField as keyof typeof a];
+      let bValue: any = b[sortField as keyof typeof b];
+      
+      // Tratamento especial para diferentes tipos de dados
+      if (sortField === 'amount') {
+        aValue = Number(aValue);
+        bValue = Number(bValue);
+      } else if (sortField === 'date') {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
+      } else {
+        aValue = String(aValue).toLowerCase();
+        bValue = String(bValue).toLowerCase();
+      }
+      
+      if (aValue < bValue) {
+        return sortDirection === "asc" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortDirection === "asc" ? 1 : -1;
+      }
+      return 0;
+    });
 
   const handleSelectItem = (itemId: string, checked: boolean) => {
     const newSelectedItems = new Set(selectedItems);
@@ -228,7 +257,7 @@ const Lancamentos = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItems.has(item.id));
+  const allFilteredSelected = filteredAndSortedItems.length > 0 && filteredAndSortedItems.every(item => selectedItems.has(item.id));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -345,6 +374,7 @@ const Lancamentos = () => {
                 setSelectedBank("all");
                 setSelectedCategory("all");
                 setSelectedType("all");
+                setSortField("");
               }}
             >
               Limpar Filtros
@@ -357,8 +387,8 @@ const Lancamentos = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
-            <span>Lançamentos ({filteredItems.length})</span>
-            {filteredItems.length > 0 && (
+            <span>Lançamentos ({filteredAndSortedItems.length})</span>
+            {filteredAndSortedItems.length > 0 && (
               <div className="flex items-center gap-2">
                 <Checkbox
                   checked={allFilteredSelected}
@@ -372,7 +402,7 @@ const Lancamentos = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredItems.length === 0 ? (
+          {filteredAndSortedItems.length === 0 ? (
             <div className="text-center py-12">
               <div className="mb-4">
                 <div className="w-16 h-16 bg-navy-100 rounded-full flex items-center justify-center mx-auto">
@@ -407,17 +437,65 @@ const Lancamentos = () => {
                         onCheckedChange={handleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Banco</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('date')}
+                        className="flex items-center gap-1 hover:text-orange-500 transition-colors"
+                      >
+                        Data
+                        {getSortIcon('date')}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('description')}
+                        className="flex items-center gap-1 hover:text-orange-500 transition-colors"
+                      >
+                        Descrição
+                        {getSortIcon('description')}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('type')}
+                        className="flex items-center gap-1 hover:text-orange-500 transition-colors"
+                      >
+                        Tipo
+                        {getSortIcon('type')}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('category')}
+                        className="flex items-center gap-1 hover:text-orange-500 transition-colors"
+                      >
+                        Categoria
+                        {getSortIcon('category')}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('bank')}
+                        className="flex items-center gap-1 hover:text-orange-500 transition-colors"
+                      >
+                        Banco
+                        {getSortIcon('bank')}
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button
+                        onClick={() => handleSort('amount')}
+                        className="flex items-center gap-1 hover:text-orange-500 transition-colors ml-auto"
+                      >
+                        Valor
+                        {getSortIcon('amount')}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredItems.map((item) => (
+                  {filteredAndSortedItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <Checkbox
