@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,25 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
   const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
   
-  // Busca categorias existentes do usuário
+  // Categorias fixas definidas pelo usuário
+  const fixedCategories = [
+    'Carro',
+    'Comida',
+    'Contas Mensais',
+    'Entre bancos',
+    'Escritório',
+    'Estudos',
+    'Go On Outdoor',
+    'Imposto',
+    'Investimentos',
+    'Lazer e ócio',
+    'Pro-Labore',
+    'Vida esportiva',
+    'Anúncios Online',
+    'Itens Físicos'
+  ];
+
+  // Busca categorias personalizadas do usuário
   const { data: userCategories = [] } = useQuery({
     queryKey: ['user-categories'],
     queryFn: async () => {
@@ -41,59 +60,16 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         .eq('user_id', user.id);
       
       if (error) throw error;
-      return [...new Set(data.map(item => item.category))];
-    },
-    enabled: isOpen
-  });
-
-  // Busca as categorias do CategoryManager
-  const { data: categoriesFromManager = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-      
-      // Primeiro busca as categorias locais do CategoryManager
-      const localCategories = queryClient.getQueryData(['categories', user.id]) as string[] || [];
-      
-      // Depois busca as categorias do banco
-      const { data, error } = await supabase
-        .from('financial_items')
-        .select('category')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
       const dbCategories = [...new Set(data.map(item => item.category))];
       
-      // Combina todas as categorias
-      return [...new Set([...localCategories, ...dbCategories])];
+      // Retorna apenas categorias que não estão nas fixas
+      return dbCategories.filter(cat => !fixedCategories.includes(cat));
     },
     enabled: isOpen
   });
 
-  // Categorias padrão predefinidas
-  const defaultCategories = [
-    'Comida',
-    'Escritório', 
-    'Lazer e ócio',
-    'Carro',
-    'Alimentação',
-    'Transporte',
-    'Moradia',
-    'Saúde',
-    'Educação',
-    'Lazer',
-    'Vestuário',
-    'Tecnologia',
-    'Investimentos',
-    'Salário',
-    'Freelance',
-    'Vendas',
-    'Outros'
-  ];
-
-  // Combina todas as categorias disponíveis
-  const allCategories = [...new Set([...defaultCategories, ...userCategories, ...categoriesFromManager])].sort();
+  // Combina categorias fixas com categorias personalizadas
+  const allCategories = [...fixedCategories, ...userCategories].sort();
 
   const types = [
     { value: 'entrada', label: 'Entrada' },

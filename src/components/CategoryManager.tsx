@@ -30,6 +30,24 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Categorias fixas definidas pelo usuário
+  const fixedCategories = [
+    'Carro',
+    'Comida',
+    'Contas Mensais',
+    'Entre bancos',
+    'Escritório',
+    'Estudos',
+    'Go On Outdoor',
+    'Imposto',
+    'Investimentos',
+    'Lazer e ócio',
+    'Pro-Labore',
+    'Vida esportiva',
+    'Anúncios Online',
+    'Itens Físicos'
+  ];
+
   const { data: dbCategories = [], refetch } = useQuery({
     queryKey: ['categories', userId],
     queryFn: async () => {
@@ -44,29 +62,9 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
     enabled: !!userId
   });
 
-  // Categorias padrão predefinidas (mesmas do NewEntryModal)
-  const defaultCategories = [
-    'Comida',
-    'Escritório', 
-    'Lazer e ócio',
-    'Carro',
-    'Alimentação',
-    'Transporte',
-    'Moradia',
-    'Saúde',
-    'Educação',
-    'Lazer',
-    'Vestuário',
-    'Tecnologia',
-    'Investimentos',
-    'Salário',
-    'Freelance',
-    'Vendas',
-    'Outros'
-  ];
-
-  // Combina categorias padrão com categorias do banco
-  const allCategories = [...new Set([...defaultCategories, ...dbCategories])].sort();
+  // Combina categorias fixas com categorias personalizadas do banco
+  const customCategories = dbCategories.filter(cat => !fixedCategories.includes(cat));
+  const allCategories = [...fixedCategories, ...customCategories].sort();
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
@@ -120,14 +118,13 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
       });
       setEditingCategory(null);
       refetch();
-      // Invalida as queries para atualizar em todos os lugares
       queryClient.invalidateQueries({ queryKey: ['user-categories'] });
     }
   };
 
   const handleDeleteCategory = async (category: string) => {
-    // Se é uma categoria padrão, não permite deletar
-    if (defaultCategories.includes(category)) {
+    // Se é uma categoria fixa, não permite deletar
+    if (fixedCategories.includes(category)) {
       toast({
         title: "Erro",
         description: "Não é possível excluir categorias padrão",
@@ -199,15 +196,15 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
                 <>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{category}</Badge>
-                    {defaultCategories.includes(category) && (
+                    {fixedCategories.includes(category) && (
                       <Badge variant="secondary" className="text-xs">Padrão</Badge>
                     )}
-                    {!dbCategories.includes(category) && !defaultCategories.includes(category) && (
+                    {!dbCategories.includes(category) && !fixedCategories.includes(category) && (
                       <Badge variant="secondary" className="text-xs">Nova</Badge>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    {!defaultCategories.includes(category) && (
+                    {!fixedCategories.includes(category) && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -216,7 +213,7 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
                         <Edit className="h-4 w-4" />
                       </Button>
                     )}
-                    {!defaultCategories.includes(category) && (
+                    {!fixedCategories.includes(category) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="ghost" className="text-red-600">
