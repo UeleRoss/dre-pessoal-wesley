@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -27,30 +28,38 @@ const Analise = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Dados do mês atual
-  const { data: monthlyData = [] } = useQuery({
-    queryKey: ['monthly-analysis', selectedMonth.getMonth(), selectedMonth.getFullYear()],
+  // Dados do mês atual - garantindo que sempre busque da tabela financial_items
+  const { data: monthlyData = [], refetch: refetchMonthly } = useQuery({
+    queryKey: ['monthly-analysis', selectedMonth.getMonth(), selectedMonth.getFullYear(), user?.id],
     queryFn: async () => {
       if (!user) return [];
       
       const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
       const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
       
+      console.log('Buscando dados financeiros para análise:', { startDate, endDate, userId: user.id });
+      
       const { data, error } = await supabase
         .from('financial_items')
         .select('*')
         .gte('date', startDate.toISOString().split('T')[0])
         .lte('date', endDate.toISOString().split('T')[0])
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar dados financeiros:', error);
+        throw error;
+      }
+      
+      console.log('Dados financeiros encontrados:', data);
       return data || [];
     },
     enabled: !!user
   });
 
-  // Dados dos últimos 6 meses para tendência
-  const { data: trendData = [] } = useQuery({
+  // Dados dos últimos 6 meses para tendência - sempre atualizado
+  const { data: trendData = [], refetch: refetchTrend } = useQuery({
     queryKey: ['trend-analysis', user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -59,6 +68,8 @@ const Analise = () => {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
       sixMonthsAgo.setDate(1);
       
+      console.log('Buscando dados de tendência desde:', sixMonthsAgo);
+      
       const { data, error } = await supabase
         .from('financial_items')
         .select('*')
@@ -66,79 +77,139 @@ const Analise = () => {
         .eq('user_id', user.id)
         .order('date', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar dados de tendência:', error);
+        throw error;
+      }
+      
+      console.log('Dados de tendência encontrados:', data);
       return data || [];
     },
     enabled: !!user
   });
 
+  // Atualizar dados quando houver mudanças nos lançamentos
+  useEffect(() => {
+    if (user) {
+      const channel = supabase
+        .channel('financial-items-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'financial_items',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            console.log('Dados financeiros alterados, atualizando análise...');
+            refetchMonthly();
+            refetchTrend();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user, refetchMonthly, refetchTrend]);
+
   if (!user) {
     return <Auth onAuthChange={setUser} />;
   }
 
-  // Processamento dos dados
+  // Processamento dos dados mensais
   const processMonthlyData = () => {
-    const revenue = monthlyData.filter(item => item.type === 'entrada').reduce((sum, item) => sum + item.amount, 0);
-    const expenses = monthlyData.filter(item => item.type === 'saida').reduce((sum, item) => sum + item.amount, 0);
+    console.log('Processando dados mensais:', monthlyData);
+    
+    const revenue = monthlyData
+      .filter(item => item.type === 'entrada')
+      .reduce((sum, item) => sum + Number(item.amount), 0);
+    
+    const expenses = monthlyData
+      .filter(item => item.type === 'saida')
+      .reduce((sum, item) => sum + Number(item.amount), 0);
+    
     const profit = revenue - expenses;
+    
+    console.log('Resultado processamento mensal:', { revenue, expenses, profit });
     
     return { revenue, expenses, profit };
   };
 
+  // Processamento dados por categoria (apenas saídas)
   const processCategoryData = () => {
-    const categoryTotals = monthlyData
+    const expensesByCategory = monthlyData
       .filter(item => item.type === 'saida')
       .reduce((acc, item) => {
-        acc[item.category] = (acc[item.category] || 0) + item.amount;
+        const category = item.category || 'Sem categoria';
+        acc[category] = (acc[category] || 0) + Number(item.amount);
         return acc;
       }, {} as Record<string, number>);
 
-    return Object.entries(categoryTotals)
+    const result = Object.entries(expensesByCategory)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+    
+    console.log('Dados por categoria:', result);
+    return result;
   };
 
+  // Processamento dados de tendência (últimos 6 meses)
   const processTrendData = () => {
     const monthlyTotals = trendData.reduce((acc, item) => {
-      const monthKey = new Date(item.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      const date = new Date(item.date);
+      const monthKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      
       if (!acc[monthKey]) {
         acc[monthKey] = { month: monthKey, receitas: 0, despesas: 0, lucro: 0 };
       }
       
+      const amount = Number(item.amount);
       if (item.type === 'entrada') {
-        acc[monthKey].receitas += item.amount;
+        acc[monthKey].receitas += amount;
       } else if (item.type === 'saida') {
-        acc[monthKey].despesas += item.amount;
+        acc[monthKey].despesas += amount;
       }
       
       acc[monthKey].lucro = acc[monthKey].receitas - acc[monthKey].despesas;
       return acc;
     }, {} as Record<string, any>);
 
-    return Object.values(monthlyTotals);
+    const result = Object.values(monthlyTotals);
+    console.log('Dados de tendência processados:', result);
+    return result;
   };
 
+  // Processamento dados por banco
   const processBankData = () => {
     const bankTotals = monthlyData.reduce((acc, item) => {
-      if (!acc[item.bank]) {
-        acc[item.bank] = { receitas: 0, despesas: 0 };
+      const bank = item.bank || 'Sem banco';
+      
+      if (!acc[bank]) {
+        acc[bank] = { receitas: 0, despesas: 0 };
       }
       
+      const amount = Number(item.amount);
       if (item.type === 'entrada') {
-        acc[item.bank].receitas += item.amount;
+        acc[bank].receitas += amount;
       } else if (item.type === 'saida') {
-        acc[item.bank].despesas += item.amount;
+        acc[bank].despesas += amount;
       }
       
       return acc;
     }, {} as Record<string, any>);
 
-    return Object.entries(bankTotals).map(([banco, data]) => ({
+    const result = Object.entries(bankTotals).map(([banco, data]) => ({
       banco,
       saldo: (data as any).receitas - (data as any).despesas,
       receitas: (data as any).receitas,
       despesas: (data as any).despesas
     }));
+    
+    console.log('Dados por banco:', result);
+    return result;
   };
 
   const monthlyStats = processMonthlyData();
@@ -177,6 +248,9 @@ const Analise = () => {
             <div className="text-2xl font-bold text-green-600">
               {monthlyStats.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {monthlyData.filter(item => item.type === 'entrada').length} lançamentos
+            </p>
           </CardContent>
         </Card>
 
@@ -189,6 +263,9 @@ const Analise = () => {
             <div className="text-2xl font-bold text-red-600">
               {monthlyStats.expenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {monthlyData.filter(item => item.type === 'saida').length} lançamentos
+            </p>
           </CardContent>
         </Card>
 
@@ -201,6 +278,9 @@ const Analise = () => {
             <div className={`text-2xl font-bold ${monthlyStats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {monthlyStats.profit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {monthlyData.length} lançamentos totais
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -222,17 +302,23 @@ const Analise = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={chartConfig} className="h-[400px]">
-                <LineChart data={trendChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="receitas" stroke="#16a34a" strokeWidth={2} />
-                  <Line type="monotone" dataKey="despesas" stroke="#dc2626" strokeWidth={2} />
-                  <Line type="monotone" dataKey="lucro" stroke="#f97316" strokeWidth={2} />
-                </LineChart>
-              </ChartContainer>
+              {trendChartData.length > 0 ? (
+                <ChartContainer config={chartConfig} className="h-[400px]">
+                  <LineChart data={trendChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="receitas" stroke="#16a34a" strokeWidth={2} />
+                    <Line type="monotone" dataKey="despesas" stroke="#dc2626" strokeWidth={2} />
+                    <Line type="monotone" dataKey="lucro" stroke="#f97316" strokeWidth={2} />
+                  </LineChart>
+                </ChartContainer>
+              ) : (
+                <div className="h-[400px] flex items-center justify-center text-gray-500">
+                  <p>Nenhum dado encontrado para os últimos 6 meses</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -246,26 +332,34 @@ const Analise = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Pie data={categoryData} cx="50%" cy="50%" outerRadius={120} dataKey="value">
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                {categoryData.map((item, index) => (
-                  <div key={item.name} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                    <span className="text-sm">{item.name}: {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              {categoryData.length > 0 ? (
+                <>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Pie data={categoryData} cx="50%" cy="50%" outerRadius={120} dataKey="value">
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    {categoryData.map((item, index) => (
+                      <div key={item.name} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                        <span className="text-sm">{item.name}: {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="h-[400px] flex items-center justify-center text-gray-500">
+                  <p>Nenhuma despesa encontrada neste mês</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -275,20 +369,26 @@ const Analise = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-orange-500" />
-                Movimentação por Banco
+                Movimentação por Banco - {selectedMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={chartConfig} className="h-[400px]">
-                <BarChart data={bankData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="banco" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="receitas" fill="#16a34a" />
-                  <Bar dataKey="despesas" fill="#dc2626" />
-                </BarChart>
-              </ChartContainer>
+              {bankData.length > 0 ? (
+                <ChartContainer config={chartConfig} className="h-[400px]">
+                  <BarChart data={bankData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="banco" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="receitas" fill="#16a34a" />
+                    <Bar dataKey="despesas" fill="#dc2626" />
+                  </BarChart>
+                </ChartContainer>
+              ) : (
+                <div className="h-[400px] flex items-center justify-center text-gray-500">
+                  <p>Nenhuma movimentação encontrada neste mês</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -315,14 +415,16 @@ const Analise = () => {
                     <span>DESPESAS TOTAIS</span>
                     <span>{monthlyStats.expenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
-                  <div className="ml-4 space-y-1 mt-2">
-                    {categoryData.map((category) => (
-                      <div key={category.name} className="flex justify-between text-sm text-gray-600">
-                        <span>• {category.name}</span>
-                        <span>{category.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {categoryData.length > 0 && (
+                    <div className="ml-4 space-y-1 mt-2">
+                      {categoryData.map((category) => (
+                        <div key={category.name} className="flex justify-between text-sm text-gray-600">
+                          <span>• {category.name}</span>
+                          <span>{category.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="pt-2">
@@ -337,6 +439,8 @@ const Analise = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>Margem de Lucro: {monthlyStats.revenue > 0 ? ((monthlyStats.profit / monthlyStats.revenue) * 100).toFixed(1) : 0}%</div>
                     <div>Total de Lançamentos: {monthlyData.length}</div>
+                    <div>Receitas: {monthlyData.filter(item => item.type === 'entrada').length} lançamentos</div>
+                    <div>Despesas: {monthlyData.filter(item => item.type === 'saida').length} lançamentos</div>
                   </div>
                 </div>
               </div>

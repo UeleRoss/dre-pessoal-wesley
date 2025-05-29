@@ -20,27 +20,34 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-interface BankManagerProps {
-  userId: string;
-}
-
-const BankManager = ({ userId }: BankManagerProps) => {
+const BankManager = () => {
   const [newBank, setNewBank] = useState("");
   const [editingBank, setEditingBank] = useState<{ old: string; new: string } | null>(null);
   const { toast } = useToast();
 
-  const { data: banks = [], refetch } = useQuery({
-    queryKey: ['banks', userId],
+  // Get current user
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
     queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user;
+    }
+  });
+
+  const { data: banks = [], refetch } = useQuery({
+    queryKey: ['banks', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
       const { data, error } = await supabase
         .from('financial_items')
         .select('bank')
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       
       if (error) throw error;
       return [...new Set(data.map(item => item.bank))];
     },
-    enabled: !!userId
+    enabled: !!user?.id
   });
 
   const handleAddBank = async () => {
@@ -63,12 +70,12 @@ const BankManager = ({ userId }: BankManagerProps) => {
   };
 
   const handleEditBank = async () => {
-    if (!editingBank || !editingBank.new.trim()) return;
+    if (!editingBank || !editingBank.new.trim() || !user?.id) return;
     
     const { error } = await supabase
       .from('financial_items')
       .update({ bank: editingBank.new })
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .eq('bank', editingBank.old);
     
     if (error) {
@@ -88,10 +95,12 @@ const BankManager = ({ userId }: BankManagerProps) => {
   };
 
   const handleDeleteBank = async (bank: string) => {
+    if (!user?.id) return;
+    
     const { error } = await supabase
       .from('financial_items')
       .delete()
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .eq('bank', bank);
     
     if (error) {
