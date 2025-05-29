@@ -301,8 +301,8 @@ const Lancamentos = () => {
                 </SheetDescription>
               </SheetHeader>
               <div className="space-y-6 mt-6">
-                <BankManager userId={user.id} />
-                <CategoryManager userId={user.id} />
+                <BankManager />
+                <CategoryManager />
               </div>
             </SheetContent>
           </Sheet>
