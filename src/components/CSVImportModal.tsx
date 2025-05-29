@@ -32,7 +32,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
 
   const parseCSV = (text: string) => {
     const lines = text.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
     
     return lines.slice(1).map(line => {
       if (line.trim() === '') return null;
@@ -56,35 +56,93 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       const text = await file.text();
       const records = parseCSV(text);
       
-      const financialItems = records.map((record: any) => ({
-        user_id: user.id,
-        date: record.date || record.data,
-        type: record.type || record.tipo || 'entrada',
-        description: record.description || record.descricao || '',
-        amount: parseFloat(record.amount || record.valor || '0'),
-        category: record.category || record.categoria || '',
-        bank: record.bank || record.banco || 'CONTA SIMPLES',
-        source: 'CSV Import'
-      }));
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const record of records) {
+        try {
+          // Mapeamento flexível dos campos
+          const date = record.date || record.data || record.d || new Date().toISOString().split('T')[0];
+          const type = (record.type || record.tipo || record.t || 'entrada').toLowerCase();
+          const description = record.description || record.descricao || record.desc || 'Sem descrição';
+          const amount = parseFloat(record.amount || record.valor || record.v || '0');
+          const category = record.category || record.categoria || record.cat || 'Sem categoria';
+          const bank = record.bank || record.banco || record.b || 'CONTA SIMPLES';
+          
+          // Validação básica
+          if (amount === 0 || isNaN(amount)) {
+            console.log('Ignorando linha com valor inválido:', record);
+            continue;
+          }
 
-      const { error } = await supabase
-        .from('financial_items')
-        .insert(financialItems);
+          // Validação de data
+          let validDate = date;
+          if (!date || date === '') {
+            validDate = new Date().toISOString().split('T')[0];
+          } else {
+            // Tenta converter diferentes formatos de data
+            const dateObj = new Date(date);
+            if (isNaN(dateObj.getTime())) {
+              console.log('Data inválida, usando data atual:', date);
+              validDate = new Date().toISOString().split('T')[0];
+            } else {
+              validDate = dateObj.toISOString().split('T')[0];
+            }
+          }
 
-      if (error) throw error;
+          // Validação de tipo
+          const validType = ['entrada', 'saida', 'transferencia'].includes(type) ? type : 'entrada';
 
-      toast({
-        title: "Importação concluída!",
-        description: `${financialItems.length} registros importados com sucesso.`,
-      });
+          const financialItem = {
+            user_id: user.id,
+            date: validDate,
+            type: validType,
+            description: description || 'Importado do CSV',
+            amount: Math.abs(amount), // Garante que seja positivo
+            category: category || 'Importado',
+            bank: bank || 'CONTA SIMPLES',
+            source: 'CSV Import'
+          };
 
-      onSuccess();
-      onClose();
+          const { error } = await supabase
+            .from('financial_items')
+            .insert(financialItem);
+
+          if (error) {
+            console.error('Erro ao inserir registro:', error, financialItem);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (itemError) {
+          console.error('Erro ao processar item:', itemError, record);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Importação concluída!",
+          description: `${successCount} registros importados com sucesso.${errorCount > 0 ? ` ${errorCount} registros ignorados devido a erros.` : ''}`,
+        });
+      } else {
+        toast({
+          title: "Nenhum registro importado",
+          description: "Verifique se o arquivo CSV está no formato correto.",
+          variant: "destructive",
+        });
+      }
+
+      if (successCount > 0) {
+        onSuccess();
+        onClose();
+      }
       setFile(null);
     } catch (error: any) {
+      console.error('Erro geral na importação:', error);
       toast({
         title: "Erro na importação",
-        description: error.message,
+        description: "Ocorreu um erro durante a importação. Verifique o arquivo e tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -93,7 +151,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   };
 
   const downloadTemplate = () => {
-    const template = "date,type,description,amount,category,bank\n2024-01-01,entrada,Salário,5000.00,Trabalho,CONTA SIMPLES";
+    const template = "date,type,description,amount,category,bank\n2024-01-01,entrada,Salário,5000.00,Trabalho,CONTA SIMPLES\n2024-01-02,saida,Compras,150.75,Alimentação,BRADESCO\n2024-01-03,transferencia,PIX,200.00,Transferência,C6 BANK";
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -117,7 +175,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              Importe seus registros financeiros dos últimos 2 anos usando um arquivo CSV.
+              Importe seus registros financeiros usando um arquivo CSV. O sistema agora aceita dados incompletos.
             </p>
             
             <Button 
@@ -151,8 +209,14 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
           )}
 
           <div className="text-xs text-gray-500">
-            <p>Formato esperado do CSV:</p>
-            <p>date, type, description, amount, category, bank</p>
+            <p><strong>Campos aceitos (flexível):</strong></p>
+            <p>• Data: date, data, d</p>
+            <p>• Tipo: type, tipo, t</p>
+            <p>• Descrição: description, descricao, desc</p>
+            <p>• Valor: amount, valor, v</p>
+            <p>• Categoria: category, categoria, cat</p>
+            <p>• Banco: bank, banco, b</p>
+            <p className="mt-2 text-green-600">✓ Dados incompletos serão preenchidos automaticamente</p>
           </div>
 
           <Button 
