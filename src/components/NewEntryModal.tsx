@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Categorias fixas
 const FIXED_CATEGORIES = [
@@ -27,8 +27,6 @@ const FIXED_CATEGORIES = [
   "Itens Físicos"
 ];
 
-const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
-
 interface NewEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,6 +44,37 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   });
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Buscar usuário atual
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user;
+    }
+  });
+
+  // Buscar bancos disponíveis (dinâmico)
+  const { data: availableBanks = [] } = useQuery({
+    queryKey: ['available-banks', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const dynamicBanks = [...new Set(data.map(item => item.bank))];
+      // Combinar bancos fixos com os dinâmicos
+      const fixedBanks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
+      return [...fixedBanks, ...dynamicBanks.filter(bank => !fixedBanks.includes(bank))];
+    },
+    enabled: !!user?.id
+  });
 
   // Buscar categorias personalizadas
   const { data: customCategories = [] } = useQuery({
@@ -69,15 +98,14 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) throw new Error('Usuário não autenticado');
+      if (!user) throw new Error('Usuário não autenticado');
 
       const { error } = await supabase
         .from('financial_items')
         .insert([{
           ...data,
           amount: parseFloat(data.amount),
-          user_id: user.data.user.id
+          user_id: user.id
         }]);
       
       if (error) throw error;
@@ -90,6 +118,11 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       onSuccess();
       onClose();
       resetForm();
+      // Invalidar todas as queries relacionadas para atualização em tempo real
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly-analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['trend-analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
     },
     onError: () => {
       toast({
@@ -218,7 +251,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectValue placeholder="Selecione o banco" />
               </SelectTrigger>
               <SelectContent>
-                {BANKS.map((bank) => (
+                {availableBanks.map((bank) => (
                   <SelectItem key={bank} value={bank}>
                     {bank}
                   </SelectItem>

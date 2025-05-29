@@ -28,7 +28,7 @@ const Analise = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Dados do mês atual - garantindo que sempre busque da tabela financial_items
+  // Dados do mês atual - sempre atualizado da tabela financial_items
   const { data: monthlyData = [], refetch: refetchMonthly } = useQuery({
     queryKey: ['monthly-analysis', selectedMonth.getMonth(), selectedMonth.getFullYear(), user?.id],
     queryFn: async () => {
@@ -36,8 +36,6 @@ const Analise = () => {
       
       const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
       const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
-      
-      console.log('Buscando dados financeiros para análise:', { startDate, endDate, userId: user.id });
       
       const { data, error } = await supabase
         .from('financial_items')
@@ -47,18 +45,15 @@ const Analise = () => {
         .eq('user_id', user.id)
         .order('date', { ascending: false });
       
-      if (error) {
-        console.error('Erro ao buscar dados financeiros:', error);
-        throw error;
-      }
-      
-      console.log('Dados financeiros encontrados:', data);
+      if (error) throw error;
       return data || [];
     },
-    enabled: !!user
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
 
-  // Dados dos últimos 6 meses para tendência - sempre atualizado
+  // Dados dos últimos 6 meses para tendência
   const { data: trendData = [], refetch: refetchTrend } = useQuery({
     queryKey: ['trend-analysis', user?.id],
     queryFn: async () => {
@@ -68,8 +63,6 @@ const Analise = () => {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
       sixMonthsAgo.setDate(1);
       
-      console.log('Buscando dados de tendência desde:', sixMonthsAgo);
-      
       const { data, error } = await supabase
         .from('financial_items')
         .select('*')
@@ -77,22 +70,19 @@ const Analise = () => {
         .eq('user_id', user.id)
         .order('date', { ascending: true });
       
-      if (error) {
-        console.error('Erro ao buscar dados de tendência:', error);
-        throw error;
-      }
-      
-      console.log('Dados de tendência encontrados:', data);
+      if (error) throw error;
       return data || [];
     },
-    enabled: !!user
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
 
-  // Atualizar dados quando houver mudanças nos lançamentos
+  // Escutar mudanças em tempo real
   useEffect(() => {
     if (user) {
       const channel = supabase
-        .channel('financial-items-changes')
+        .channel('financial-analysis-updates')
         .on(
           'postgres_changes',
           {
@@ -102,7 +92,6 @@ const Analise = () => {
             filter: `user_id=eq.${user.id}`
           },
           () => {
-            console.log('Dados financeiros alterados, atualizando análise...');
             refetchMonthly();
             refetchTrend();
           }
@@ -121,8 +110,6 @@ const Analise = () => {
 
   // Processamento dos dados mensais
   const processMonthlyData = () => {
-    console.log('Processando dados mensais:', monthlyData);
-    
     const revenue = monthlyData
       .filter(item => item.type === 'entrada')
       .reduce((sum, item) => sum + Number(item.amount), 0);
@@ -132,8 +119,6 @@ const Analise = () => {
       .reduce((sum, item) => sum + Number(item.amount), 0);
     
     const profit = revenue - expenses;
-    
-    console.log('Resultado processamento mensal:', { revenue, expenses, profit });
     
     return { revenue, expenses, profit };
   };
@@ -148,12 +133,9 @@ const Analise = () => {
         return acc;
       }, {} as Record<string, number>);
 
-    const result = Object.entries(expensesByCategory)
+    return Object.entries(expensesByCategory)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-    
-    console.log('Dados por categoria:', result);
-    return result;
   };
 
   // Processamento dados de tendência (últimos 6 meses)
@@ -177,9 +159,7 @@ const Analise = () => {
       return acc;
     }, {} as Record<string, any>);
 
-    const result = Object.values(monthlyTotals);
-    console.log('Dados de tendência processados:', result);
-    return result;
+    return Object.values(monthlyTotals);
   };
 
   // Processamento dados por banco
@@ -201,15 +181,12 @@ const Analise = () => {
       return acc;
     }, {} as Record<string, any>);
 
-    const result = Object.entries(bankTotals).map(([banco, data]) => ({
+    return Object.entries(bankTotals).map(([banco, data]) => ({
       banco,
       saldo: (data as any).receitas - (data as any).despesas,
       receitas: (data as any).receitas,
       despesas: (data as any).despesas
     }));
-    
-    console.log('Dados por banco:', result);
-    return result;
   };
 
   const monthlyStats = processMonthlyData();
@@ -228,7 +205,7 @@ const Analise = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-navy-800">Análise Financeira</h1>
-          <p className="text-navy-600 mt-1">Relatórios visuais e tendências dos seus dados</p>
+          <p className="text-navy-600 mt-1">Relatórios visuais sincronizados em tempo real</p>
         </div>
       </div>
 
@@ -279,7 +256,7 @@ const Analise = () => {
               {monthlyStats.profit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {monthlyData.length} lançamentos totais
+              Margem: {monthlyStats.revenue > 0 ? ((monthlyStats.profit / monthlyStats.revenue) * 100).toFixed(1) : 0}%
             </p>
           </CardContent>
         </Card>
@@ -316,7 +293,10 @@ const Analise = () => {
                 </ChartContainer>
               ) : (
                 <div className="h-[400px] flex items-center justify-center text-gray-500">
-                  <p>Nenhum dado encontrado para os últimos 6 meses</p>
+                  <div className="text-center">
+                    <p className="text-lg font-medium">Sem dados suficientes</p>
+                    <p className="text-sm">Adicione lançamentos para visualizar a tendência</p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -350,14 +330,20 @@ const Analise = () => {
                     {categoryData.map((item, index) => (
                       <div key={item.name} className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-sm">{item.name}: {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <span className="text-sm font-medium">{item.name}</span>
+                        <span className="text-sm text-gray-600">
+                          {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
                 <div className="h-[400px] flex items-center justify-center text-gray-500">
-                  <p>Nenhuma despesa encontrada neste mês</p>
+                  <div className="text-center">
+                    <p className="text-lg font-medium">Nenhuma despesa encontrada</p>
+                    <p className="text-sm">Adicione lançamentos de saída para este mês</p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -386,7 +372,10 @@ const Analise = () => {
                 </ChartContainer>
               ) : (
                 <div className="h-[400px] flex items-center justify-center text-gray-500">
-                  <p>Nenhuma movimentação encontrada neste mês</p>
+                  <div className="text-center">
+                    <p className="text-lg font-medium">Sem movimentações</p>
+                    <p className="text-sm">Adicione lançamentos para visualizar por banco</p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -435,12 +424,24 @@ const Analise = () => {
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold mb-2">Indicadores:</h4>
+                  <h4 className="font-semibold mb-2">Indicadores Financeiros:</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>Margem de Lucro: {monthlyStats.revenue > 0 ? ((monthlyStats.profit / monthlyStats.revenue) * 100).toFixed(1) : 0}%</div>
-                    <div>Total de Lançamentos: {monthlyData.length}</div>
-                    <div>Receitas: {monthlyData.filter(item => item.type === 'entrada').length} lançamentos</div>
-                    <div>Despesas: {monthlyData.filter(item => item.type === 'saida').length} lançamentos</div>
+                    <div className="flex justify-between">
+                      <span>Margem de Lucro:</span>
+                      <span className="font-medium">{monthlyStats.revenue > 0 ? ((monthlyStats.profit / monthlyStats.revenue) * 100).toFixed(1) : 0}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total de Lançamentos:</span>
+                      <span className="font-medium">{monthlyData.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Lançamentos de Entrada:</span>
+                      <span className="font-medium">{monthlyData.filter(item => item.type === 'entrada').length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Lançamentos de Saída:</span>
+                      <span className="font-medium">{monthlyData.filter(item => item.type === 'saida').length}</span>
+                    </div>
                   </div>
                 </div>
               </div>

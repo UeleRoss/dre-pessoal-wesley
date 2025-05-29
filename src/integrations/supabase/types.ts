@@ -102,6 +102,83 @@ export type Database = {
         }
         Relationships: []
       }
+      investment_transactions: {
+        Row: {
+          amount: number
+          bank: string | null
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          investment_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bank?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          investment_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bank?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          investment_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_transactions_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investments: {
+        Row: {
+          category: string
+          created_at: string
+          current_balance: number
+          id: string
+          initial_amount: number
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          current_balance?: number
+          id?: string
+          initial_amount?: number
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          current_balance?: number
+          id?: string
+          initial_amount?: number
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       recurring_bills: {
         Row: {
           bank: string

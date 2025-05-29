@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -24,6 +24,7 @@ const BankManager = () => {
   const [newBank, setNewBank] = useState("");
   const [editingBank, setEditingBank] = useState<{ old: string; new: string } | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Get current user
   const { data: user } = useQuery({
@@ -50,6 +51,110 @@ const BankManager = () => {
     enabled: !!user?.id
   });
 
+  const addBankMutation = useMutation({
+    mutationFn: async (bankName: string) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      
+      // Criar um lançamento fictício apenas para adicionar o banco ao sistema
+      const { error } = await supabase
+        .from('financial_items')
+        .insert([{
+          description: `Configuração inicial - ${bankName}`,
+          amount: 0,
+          type: 'entrada',
+          category: 'Configuração',
+          bank: bankName,
+          date: new Date().toISOString().split('T')[0],
+          user_id: user.id,
+          source: 'sistema'
+        }]);
+      
+      if (error) throw error;
+      return bankName;
+    },
+    onSuccess: (bankName) => {
+      toast({
+        title: "Sucesso",
+        description: `Banco ${bankName} adicionado com sucesso!`,
+      });
+      setNewBank("");
+      refetch();
+      // Invalidar queries relacionadas para atualizar selects
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar banco",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const editBankMutation = useMutation({
+    mutationFn: async ({ oldName, newName }: { oldName: string; newName: string }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      
+      const { error } = await supabase
+        .from('financial_items')
+        .update({ bank: newName })
+        .eq('user_id', user.id)
+        .eq('bank', oldName);
+      
+      if (error) throw error;
+      return { oldName, newName };
+    },
+    onSuccess: ({ oldName, newName }) => {
+      toast({
+        title: "Sucesso",
+        description: `Banco ${oldName} renomeado para ${newName}`,
+      });
+      setEditingBank(null);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao editar banco",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteBankMutation = useMutation({
+    mutationFn: async (bankName: string) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      
+      const { error } = await supabase
+        .from('financial_items')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('bank', bankName);
+      
+      if (error) throw error;
+      return bankName;
+    },
+    onSuccess: (bankName) => {
+      toast({
+        title: "Sucesso",
+        description: `Banco ${bankName} e seus lançamentos excluídos`,
+      });
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir banco",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleAddBank = async () => {
     if (!newBank.trim()) return;
     
@@ -62,60 +167,20 @@ const BankManager = () => {
       return;
     }
 
-    setNewBank("");
-    toast({
-      title: "Sucesso",
-      description: "Banco adicionado! Você pode usá-lo em novos lançamentos",
-    });
+    addBankMutation.mutate(newBank);
   };
 
   const handleEditBank = async () => {
-    if (!editingBank || !editingBank.new.trim() || !user?.id) return;
+    if (!editingBank || !editingBank.new.trim()) return;
     
-    const { error } = await supabase
-      .from('financial_items')
-      .update({ bank: editingBank.new })
-      .eq('user_id', user.id)
-      .eq('bank', editingBank.old);
-    
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao editar banco",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Banco editado com sucesso",
-      });
-      setEditingBank(null);
-      refetch();
-    }
+    editBankMutation.mutate({
+      oldName: editingBank.old,
+      newName: editingBank.new
+    });
   };
 
   const handleDeleteBank = async (bank: string) => {
-    if (!user?.id) return;
-    
-    const { error } = await supabase
-      .from('financial_items')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('bank', bank);
-    
-    if (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir banco",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Banco e seus lançamentos excluídos com sucesso",
-      });
-      refetch();
-    }
+    deleteBankMutation.mutate(bank);
   };
 
   return (
@@ -131,9 +196,12 @@ const BankManager = () => {
             onChange={(e) => setNewBank(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleAddBank()}
           />
-          <Button onClick={handleAddBank}>
+          <Button 
+            onClick={handleAddBank}
+            disabled={addBankMutation.isPending}
+          >
             <Plus className="h-4 w-4 mr-2" />
-            Adicionar
+            {addBankMutation.isPending ? 'Adicionando...' : 'Adicionar'}
           </Button>
         </div>
         
@@ -147,7 +215,13 @@ const BankManager = () => {
                     onChange={(e) => setEditingBank({ ...editingBank, new: e.target.value })}
                     onKeyPress={(e) => e.key === 'Enter' && handleEditBank()}
                   />
-                  <Button size="sm" onClick={handleEditBank}>Salvar</Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleEditBank}
+                    disabled={editBankMutation.isPending}
+                  >
+                    {editBankMutation.isPending ? 'Salvando...' : 'Salvar'}
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => setEditingBank(null)}>
                     Cancelar
                   </Button>
@@ -178,8 +252,11 @@ const BankManager = () => {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteBank(bank)}>
-                            Excluir
+                          <AlertDialogAction 
+                            onClick={() => handleDeleteBank(bank)}
+                            disabled={deleteBankMutation.isPending}
+                          >
+                            {deleteBankMutation.isPending ? 'Excluindo...' : 'Excluir'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
