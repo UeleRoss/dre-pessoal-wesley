@@ -115,6 +115,24 @@ const Lancamentos = () => {
       return 0;
     });
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // Se já está ordenando por esse campo, inverte a direção
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Se é um campo novo, define como campo de ordenação e direção descendente
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return null;
+    }
+    return sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
+
   const handleSelectItem = (itemId: string, checked: boolean) => {
     const newSelectedItems = new Set(selectedItems);
     if (checked) {
@@ -127,7 +145,7 @@ const Lancamentos = () => {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allItemIds = new Set(filteredItems.map(item => item.id));
+      const allItemIds = new Set(filteredAndSortedItems.map(item => item.id));
       setSelectedItems(allItemIds);
     } else {
       setSelectedItems(new Set());
@@ -238,7 +256,7 @@ const Lancamentos = () => {
     const headers = ['Data', 'Descrição', 'Tipo', 'Categoria', 'Banco', 'Valor'];
     const csvContent = [
       headers.join(','),
-      ...filteredItems.map(item => [
+      ...filteredAndSortedItems.map(item => [
         item.date,
         `"${item.description}"`,
         item.type,
