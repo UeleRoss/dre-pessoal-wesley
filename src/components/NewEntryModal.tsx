@@ -1,11 +1,33 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+// Categorias fixas
+const FIXED_CATEGORIES = [
+  "Carro",
+  "Comida", 
+  "Contas Mensais",
+  "Entre bancos",
+  "Escritório",
+  "Estudos",
+  "Go On Outdoor",
+  "Imposto",
+  "Investimentos",
+  "Lazer e ócio",
+  "Pro-Labore",
+  "Vida esportiva",
+  "Anúncios Online",
+  "Itens Físicos"
+];
+
+const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -16,215 +38,210 @@ interface NewEntryModalProps {
 const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    type: 'entrada',
-    description: '',
     amount: '',
+    description: '',
+    type: 'entrada' as 'entrada' | 'saida',
     category: '',
-    bank: 'CONTA SIMPLES'
+    bank: '',
   });
-  const [loading, setLoading] = useState(false);
+
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
-  
-  // Categorias fixas definidas pelo usuário
-  const fixedCategories = [
-    'Carro',
-    'Comida',
-    'Contas Mensais',
-    'Entre bancos',
-    'Escritório',
-    'Estudos',
-    'Go On Outdoor',
-    'Imposto',
-    'Investimentos',
-    'Lazer e ócio',
-    'Pro-Labore',
-    'Vida esportiva',
-    'Anúncios Online',
-    'Itens Físicos'
-  ];
-
-  // Busca categorias personalizadas do usuário (que não estão nas fixas)
+  // Buscar categorias personalizadas
   const { data: customCategories = [] } = useQuery({
     queryKey: ['custom-categories'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-      
       const { data, error } = await supabase
-        .from('financial_items')
-        .select('category')
-        .eq('user_id', user.id);
+        .from('categories')
+        .select('*')
+        .order('name');
       
       if (error) throw error;
-      
-      // Extrai categorias únicas e filtra apenas as que não estão nas fixas
-      const dbCategories = [...new Set(data.map(item => item.category))];
-      return dbCategories.filter(cat => !fixedCategories.includes(cat));
-    },
-    enabled: isOpen
+      return data;
+    }
   });
 
-  // Combina categorias fixas com categorias personalizadas (sem duplicados)
-  const allCategories = [...fixedCategories, ...customCategories].sort();
+  // Combinar categorias fixas com personalizadas
+  const allCategories = [
+    ...FIXED_CATEGORIES,
+    ...customCategories.map(cat => cat.name)
+  ].sort();
 
-  const types = [
-    { value: 'entrada', label: 'Entrada' },
-    { value: 'saida', label: 'Saída' },
-    { value: 'transferencia', label: 'Transferência' }
-  ];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
+  const createEntryMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) throw new Error('Usuário não autenticado');
 
       const { error } = await supabase
         .from('financial_items')
-        .insert({
-          user_id: user.id,
-          date: formData.date,
-          type: formData.type,
-          description: formData.description,
-          amount: parseFloat(formData.amount),
-          category: formData.category,
-          bank: formData.bank
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Lançamento criado!",
-        description: "O lançamento foi adicionado com sucesso.",
-      });
-
-      // Invalida as queries para atualizar as listas
-      queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
-
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        type: 'entrada',
-        description: '',
-        amount: '',
-        category: '',
-        bank: 'CONTA SIMPLES'
-      });
+        .insert([{
+          ...data,
+          amount: parseFloat(data.amount),
+          user_id: user.data.user.id
+        }]);
       
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Lançamento criado",
+        description: "Novo lançamento adicionado com sucesso!",
+      });
       onSuccess();
       onClose();
-    } catch (error: any) {
+      resetForm();
+    },
+    onError: () => {
       toast({
         title: "Erro",
-        description: error.message,
+        description: "Erro ao criar lançamento.",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
+  });
+
+  const resetForm = () => {
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      amount: '',
+      description: '',
+      type: 'entrada',
+      category: '',
+      bank: '',
+    });
   };
 
-  if (!isOpen) return null;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.amount || !formData.description || !formData.category || !formData.bank) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createEntryMutation.mutate(formData);
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Novo Lançamento</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Data</label>
-              <input
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({...formData, date: e.target.value})}
-                className="w-full p-2 border rounded-lg"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Tipo</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
-                className="w-full p-2 border rounded-lg"
-                required
-              >
-                {types.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Novo Lançamento</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="date">Data</Label>
+            <Input
+              id="date"
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="type">Tipo</Label>
+            <Select
+              value={formData.type}
+              onValueChange={(value: 'entrada' | 'saida') => setFormData({ ...formData, type: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="entrada">Entrada</SelectItem>
+                <SelectItem value="saida">Saída</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="amount">Valor</Label>
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="description">Descrição</Label>
+            <Input
+              id="description"
+              placeholder="Descrição do lançamento"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="category">Categoria</Label>
+            <Select
+              value={formData.category}
+              onValueChange={(value) => setFormData({ ...formData, category: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {allCategories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Descrição</label>
-              <input
-                type="text"
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                className="w-full p-2 border rounded-lg"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Valor</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                className="w-full p-2 border rounded-lg"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Categoria</label>
-              <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent className="bg-white z-50">
-                  {allCategories.map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Banco</label>
-              <select
-                value={formData.bank}
-                onChange={(e) => setFormData({...formData, bank: e.target.value})}
-                className="w-full p-2 border rounded-lg"
-                required
-              >
-                {banks.map(bank => (
-                  <option key={bank} value={bank}>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="bank">Banco</Label>
+            <Select
+              value={formData.bank}
+              onValueChange={(value) => setFormData({ ...formData, bank: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o banco" />
+              </SelectTrigger>
+              <SelectContent>
+                {BANKS.map((bank) => (
+                  <SelectItem key={bank} value={bank}>
                     {bank}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Salvando..." : "Salvar Lançamento"}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancelar
             </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+            <Button 
+              type="submit" 
+              disabled={createEntryMutation.isPending}
+              className="flex-1"
+            >
+              {createEntryMutation.isPending ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
