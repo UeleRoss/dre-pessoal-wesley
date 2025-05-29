@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Plus, Filter, Download, Edit, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import NewEntryModal from "@/components/NewEntryModal";
@@ -20,6 +20,7 @@ const Lancamentos = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,6 +73,52 @@ const Lancamentos = () => {
     return matchesSearch && matchesBank && matchesCategory && matchesType;
   });
 
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    const newSelectedItems = new Set(selectedItems);
+    if (checked) {
+      newSelectedItems.add(itemId);
+    } else {
+      newSelectedItems.delete(itemId);
+    }
+    setSelectedItems(newSelectedItems);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allItemIds = new Set(filteredItems.map(item => item.id));
+      setSelectedItems(allItemIds);
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedItems.size === 0) return;
+    
+    const confirmMessage = `Tem certeza que deseja excluir ${selectedItems.size} lançamento(s) selecionado(s)?`;
+    if (!confirm(confirmMessage)) return;
+    
+    const { error } = await supabase
+      .from('financial_items')
+      .delete()
+      .in('id', Array.from(selectedItems));
+    
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir lançamentos",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sucesso",
+        description: `${selectedItems.size} lançamento(s) excluído(s) com sucesso`,
+      });
+      setSelectedItems(new Set());
+      refetch();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este lançamento?")) return;
     
@@ -118,6 +165,9 @@ const Lancamentos = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItems.has(item.id));
+  const someFilteredSelected = filteredItems.some(item => selectedItems.has(item.id));
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -138,6 +188,15 @@ const Lancamentos = () => {
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
+          {selectedItems.size > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir Selecionados ({selectedItems.size})
+            </Button>
+          )}
         </div>
       </div>
 
@@ -167,7 +226,7 @@ const Lancamentos = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os bancos</SelectItem>
-                {uniqueBanks.map(bank => (
+                {[...new Set(financialItems.map(item => item.bank))].map(bank => (
                   <SelectItem key={bank} value={bank}>{bank}</SelectItem>
                 ))}
               </SelectContent>
@@ -179,7 +238,7 @@ const Lancamentos = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as categorias</SelectItem>
-                {uniqueCategories.map(category => (
+                {[...new Set(financialItems.map(item => item.category))].map(category => (
                   <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}
               </SelectContent>
@@ -214,8 +273,24 @@ const Lancamentos = () => {
       {/* Tabela de Lançamentos */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            Lançamentos ({filteredItems.length})
+          <CardTitle className="flex justify-between items-center">
+            <span>Lançamentos ({filteredItems.length})</span>
+            {filteredItems.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={allFilteredSelected}
+                  onCheckedChange={handleSelectAll}
+                  ref={(el) => {
+                    if (el) {
+                      el.indeterminate = someFilteredSelected && !allFilteredSelected;
+                    }
+                  }}
+                />
+                <span className="text-sm text-gray-600">
+                  Selecionar todos
+                </span>
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -248,6 +323,17 @@ const Lancamentos = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={allFilteredSelected}
+                        onCheckedChange={handleSelectAll}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate = someFilteredSelected && !allFilteredSelected;
+                          }
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -260,6 +346,12 @@ const Lancamentos = () => {
                 <TableBody>
                   {filteredItems.map((item) => (
                     <TableRow key={item.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedItems.has(item.id)}
+                          onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                        />
+                      </TableCell>
                       <TableCell>
                         {new Date(item.date).toLocaleDateString('pt-BR')}
                       </TableCell>
