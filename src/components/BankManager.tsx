@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Plus, Trash2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ const BankManager = () => {
           description: `Configuração inicial - ${bankName}`,
           amount: 0,
           type: 'entrada',
-          category: 'Carro', // Usando uma categoria que existe
+          category: 'Carro',
           bank: bankName,
           date: new Date().toISOString().split('T')[0],
           user_id: user.id,
