@@ -81,7 +81,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
         try {
           // Mapeamento flexível dos campos
           const date = record.date || record.data || record.d || new Date().toISOString().split('T')[0];
-          const type = (record.type || record.tipo || record.t || 'entrada').toLowerCase();
+          let type = (record.type || record.tipo || record.t || 'entrada').toLowerCase().trim();
           const description = record.description || record.descricao || record.desc || 'Sem descrição';
           
           // Limpa o valor removendo "R$", espaços e convertendo vírgula para ponto
@@ -91,6 +91,18 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
           
           const category = record.category || record.categoria || record.cat || 'Sem categoria';
           const bank = record.bank || record.banco || record.b || 'CONTA SIMPLES';
+          
+          // Normalizar o tipo para garantir que seja reconhecido corretamente
+          if (type === 'saída' || type === 'saida' || type === 'out' || type === 'expense') {
+            type = 'saida';
+          } else if (type === 'entrada' || type === 'in' || type === 'income') {
+            type = 'entrada';
+          } else if (type === 'transferência' || type === 'transferencia' || type === 'transfer') {
+            type = 'transferencia';
+          } else {
+            // Se não reconhecer o tipo, manter como entrada por padrão
+            type = 'entrada';
+          }
           
           console.log('Processando registro:', { date, type, description, amount, category, bank });
           
@@ -115,13 +127,10 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             }
           }
 
-          // Validação de tipo
-          const validType = ['entrada', 'saida', 'transferencia'].includes(type) ? type : 'entrada';
-
           const financialItem = {
             user_id: user.id,
             date: validDate,
-            type: validType,
+            type: type,
             description: description || 'Importado do CSV',
             amount: Math.abs(amount), // Garante que seja positivo
             category: category || 'Importado',
@@ -238,6 +247,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             <p>• Separadores: vírgula (,) ou ponto e vírgula (;)</p>
             <p>• Valores: "R$ 100,50" ou "100.50"</p>
             <p>• Campos: date, type, description, amount, category, bank</p>
+            <p>• Tipos: "entrada", "saida", "transferencia"</p>
             <p className="mt-2 text-green-600">✓ Dados incompletos serão preenchidos automaticamente</p>
           </div>
 
