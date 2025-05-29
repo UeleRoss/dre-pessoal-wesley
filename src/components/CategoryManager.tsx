@@ -1,24 +1,13 @@
 
 import { useState } from "react";
-import { Plus, Trash2, Edit } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Trash2, Plus } from "lucide-react";
 
 interface CategoryManagerProps {
   userId: string;
@@ -26,7 +15,7 @@ interface CategoryManagerProps {
 
 const CategoryManager = ({ userId }: CategoryManagerProps) => {
   const [newCategory, setNewCategory] = useState("");
-  const [editingCategory, setEditingCategory] = useState<{ old: string; new: string } | null>(null);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -48,8 +37,9 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
     'Itens Físicos'
   ];
 
-  const { data: dbCategories = [], refetch } = useQuery({
-    queryKey: ['categories', userId],
+  // Busca apenas categorias personalizadas do usuário (que não estão nas fixas)
+  const { data: customCategories = [] } = useQuery({
+    queryKey: ['custom-categories', userId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('financial_items')
@@ -57,104 +47,101 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
         .eq('user_id', userId);
       
       if (error) throw error;
-      return [...new Set(data.map(item => item.category))];
-    },
-    enabled: !!userId
+      
+      // Extrai categorias únicas e filtra apenas as que não estão nas fixas
+      const dbCategories = [...new Set(data.map(item => item.category))];
+      return dbCategories.filter(cat => !fixedCategories.includes(cat));
+    }
   });
-
-  // Combina categorias fixas com categorias personalizadas do banco
-  const customCategories = dbCategories.filter(cat => !fixedCategories.includes(cat));
-  const allCategories = [...fixedCategories, ...customCategories].sort();
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
     
-    if (allCategories.includes(newCategory)) {
+    // Verifica se já existe nas categorias fixas
+    if (fixedCategories.includes(newCategory.trim())) {
       toast({
-        title: "Erro",
-        description: "Esta categoria já existe",
+        title: "Categoria já existe",
+        description: "Esta categoria já está disponível nas categorias padrão.",
         variant: "destructive",
       });
       return;
     }
 
-    // Atualiza a cache local para mostrar a categoria imediatamente
-    queryClient.setQueryData(['categories', userId], (oldData: string[] = []) => {
-      return [...new Set([...oldData, newCategory])];
-    });
-
-    // Também atualiza a cache de user-categories para o NewEntryModal
-    queryClient.setQueryData(['user-categories'], (oldData: string[] = []) => {
-      return [...new Set([...oldData, newCategory])];
-    });
-
-    setNewCategory("");
-    
-    toast({
-      title: "Sucesso",
-      description: "Categoria adicionada! Você pode usá-la em novos lançamentos",
-    });
-  };
-
-  const handleEditCategory = async () => {
-    if (!editingCategory || !editingCategory.new.trim()) return;
-    
-    const { error } = await supabase
-      .from('financial_items')
-      .update({ category: editingCategory.new })
-      .eq('user_id', userId)
-      .eq('category', editingCategory.old);
-    
-    if (error) {
+    // Verifica se já existe nas categorias personalizadas
+    if (customCategories.includes(newCategory.trim())) {
       toast({
-        title: "Erro",
-        description: "Erro ao editar categoria",
+        title: "Categoria já existe",
+        description: "Esta categoria personalizada já foi criada.",
         variant: "destructive",
       });
-    } else {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Cria um lançamento temporário apenas para registrar a categoria
+      const { error } = await supabase
+        .from('financial_items')
+        .insert({
+          user_id: userId,
+          date: new Date().toISOString().split('T')[0],
+          type: 'entrada',
+          description: 'Categoria criada - remover após uso',
+          amount: 0.01,
+          category: newCategory.trim(),
+          bank: 'CONTA SIMPLES',
+          source: 'Category Creation'
+        });
+
+      if (error) throw error;
+
       toast({
-        title: "Sucesso",
-        description: "Categoria editada com sucesso",
+        title: "Categoria criada!",
+        description: "A nova categoria foi adicionada com sucesso.",
       });
-      setEditingCategory(null);
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ['user-categories'] });
+
+      queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
+      setNewCategory("");
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteCategory = async (category: string) => {
-    // Se é uma categoria fixa, não permite deletar
-    if (fixedCategories.includes(category)) {
-      toast({
-        title: "Erro",
-        description: "Não é possível excluir categorias padrão",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Se tem lançamentos, deleta do banco
-    if (dbCategories.includes(category)) {
+    if (!confirm(`Tem certeza que deseja excluir a categoria "${category}"?`)) return;
+    
+    setLoading(true);
+    try {
+      // Remove todos os lançamentos com essa categoria personalizada
       const { error } = await supabase
         .from('financial_items')
         .delete()
         .eq('user_id', userId)
         .eq('category', category);
-      
-      if (error) {
-        toast({
-          title: "Erro",
-          description: "Erro ao excluir categoria",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Sucesso",
-          description: "Categoria e seus lançamentos excluídos com sucesso",
-        });
-        refetch();
-        queryClient.invalidateQueries({ queryKey: ['user-categories'] });
-      }
+
+      if (error) throw error;
+
+      toast({
+        title: "Categoria excluída!",
+        description: "A categoria e todos os lançamentos relacionados foram removidos.",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -164,6 +151,39 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
         <CardTitle>Gerenciar Categorias</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Categorias Fixas */}
+        <div>
+          <h4 className="font-medium mb-2">Categorias Padrão</h4>
+          <div className="flex flex-wrap gap-2">
+            {fixedCategories.map(category => (
+              <Badge key={category} variant="secondary">
+                {category}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Categorias Personalizadas */}
+        {customCategories.length > 0 && (
+          <div>
+            <h4 className="font-medium mb-2">Categorias Personalizadas</h4>
+            <div className="flex flex-wrap gap-2">
+              {customCategories.map(category => (
+                <Badge key={category} variant="outline" className="flex items-center gap-1">
+                  {category}
+                  <button
+                    onClick={() => handleDeleteCategory(category)}
+                    className="ml-1 text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Adicionar Nova Categoria */}
         <div className="flex gap-2">
           <Input
             placeholder="Nome da nova categoria"
@@ -171,79 +191,10 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
             onChange={(e) => setNewCategory(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
           />
-          <Button onClick={handleAddCategory}>
+          <Button onClick={handleAddCategory} disabled={loading || !newCategory.trim()}>
             <Plus className="h-4 w-4 mr-2" />
             Adicionar
           </Button>
-        </div>
-        
-        <div className="space-y-2">
-          {allCategories.map((category) => (
-            <div key={category} className="flex items-center justify-between p-2 border rounded">
-              {editingCategory?.old === category ? (
-                <div className="flex gap-2 flex-1">
-                  <Input
-                    value={editingCategory.new}
-                    onChange={(e) => setEditingCategory({ ...editingCategory, new: e.target.value })}
-                    onKeyPress={(e) => e.key === 'Enter' && handleEditCategory()}
-                  />
-                  <Button size="sm" onClick={handleEditCategory}>Salvar</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingCategory(null)}>
-                    Cancelar
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{category}</Badge>
-                    {fixedCategories.includes(category) && (
-                      <Badge variant="secondary" className="text-xs">Padrão</Badge>
-                    )}
-                    {!dbCategories.includes(category) && !fixedCategories.includes(category) && (
-                      <Badge variant="secondary" className="text-xs">Nova</Badge>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    {!fixedCategories.includes(category) && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingCategory({ old: category, new: category })}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {!fixedCategories.includes(category) && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="ghost" className="text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir Categoria</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {dbCategories.includes(category) 
-                                ? `Isso excluirá a categoria "${category}" e TODOS os lançamentos associados a ela. Esta ação não pode ser desfeita.`
-                                : `Isso excluirá a categoria "${category}". Esta ação não pode ser desfeita.`
-                              }
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteCategory(category)}>
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
         </div>
       </CardContent>
     </Card>

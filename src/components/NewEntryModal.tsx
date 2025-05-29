@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -47,9 +46,9 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     'Itens Físicos'
   ];
 
-  // Busca categorias personalizadas do usuário
-  const { data: userCategories = [] } = useQuery({
-    queryKey: ['user-categories'],
+  // Busca categorias personalizadas do usuário (que não estão nas fixas)
+  const { data: customCategories = [] } = useQuery({
+    queryKey: ['custom-categories'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
@@ -60,16 +59,16 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         .eq('user_id', user.id);
       
       if (error) throw error;
-      const dbCategories = [...new Set(data.map(item => item.category))];
       
-      // Retorna apenas categorias que não estão nas fixas
+      // Extrai categorias únicas e filtra apenas as que não estão nas fixas
+      const dbCategories = [...new Set(data.map(item => item.category))];
       return dbCategories.filter(cat => !fixedCategories.includes(cat));
     },
     enabled: isOpen
   });
 
-  // Combina categorias fixas com categorias personalizadas
-  const allCategories = [...fixedCategories, ...userCategories].sort();
+  // Combina categorias fixas com categorias personalizadas (sem duplicados)
+  const allCategories = [...fixedCategories, ...customCategories].sort();
 
   const types = [
     { value: 'entrada', label: 'Entrada' },
@@ -105,8 +104,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       });
 
       // Invalida as queries para atualizar as listas
-      queryClient.invalidateQueries({ queryKey: ['user-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
 
       setFormData({
         date: new Date().toISOString().split('T')[0],
