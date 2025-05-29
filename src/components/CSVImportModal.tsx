@@ -30,13 +30,28 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     }
   };
 
+  const detectSeparator = (text: string) => {
+    const firstLine = text.split('\n')[0];
+    // Conta quantas vírgulas e ponto e vírgulas existem na primeira linha
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    
+    // Usa o separador que aparece mais vezes
+    return semicolonCount > commaCount ? ';' : ',';
+  };
+
   const parseCSV = (text: string) => {
+    const separator = detectSeparator(text);
+    console.log('Separador detectado:', separator);
+    
     const lines = text.split('\n');
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const headers = lines[0].split(separator).map(h => h.trim().toLowerCase());
+    
+    console.log('Headers encontrados:', headers);
     
     return lines.slice(1).map(line => {
       if (line.trim() === '') return null;
-      const values = line.split(',').map(v => v.trim());
+      const values = line.split(separator).map(v => v.trim());
       const row: any = {};
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
@@ -56,6 +71,9 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       const text = await file.text();
       const records = parseCSV(text);
       
+      console.log('Registros processados:', records.length);
+      console.log('Primeiro registro:', records[0]);
+      
       let successCount = 0;
       let errorCount = 0;
       
@@ -65,9 +83,16 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
           const date = record.date || record.data || record.d || new Date().toISOString().split('T')[0];
           const type = (record.type || record.tipo || record.t || 'entrada').toLowerCase();
           const description = record.description || record.descricao || record.desc || 'Sem descrição';
-          const amount = parseFloat(record.amount || record.valor || record.v || '0');
+          
+          // Limpa o valor removendo "R$", espaços e convertendo vírgula para ponto
+          let amountStr = (record.amount || record.valor || record.v || '0').toString();
+          amountStr = amountStr.replace(/[R$\s]/g, '').replace(',', '.');
+          const amount = parseFloat(amountStr);
+          
           const category = record.category || record.categoria || record.cat || 'Sem categoria';
           const bank = record.bank || record.banco || record.b || 'CONTA SIMPLES';
+          
+          console.log('Processando registro:', { date, type, description, amount, category, bank });
           
           // Validação básica
           if (amount === 0 || isNaN(amount)) {
@@ -151,7 +176,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   };
 
   const downloadTemplate = () => {
-    const template = "date,type,description,amount,category,bank\n2024-01-01,entrada,Salário,5000.00,Trabalho,CONTA SIMPLES\n2024-01-02,saida,Compras,150.75,Alimentação,BRADESCO\n2024-01-03,transferencia,PIX,200.00,Transferência,C6 BANK";
+    const template = "date;type;description;amount;category;bank\n2024-01-01;entrada;Salário;5000,00;Trabalho;CONTA SIMPLES\n2024-01-02;saida;Compras;150,75;Alimentação;BRADESCO\n2024-01-03;transferencia;PIX;200,00;Transferência;C6 BANK";
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -175,7 +200,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              Importe seus registros financeiros usando um arquivo CSV. O sistema agora aceita dados incompletos.
+              Importe seus registros financeiros usando um arquivo CSV. O sistema detecta automaticamente o separador (vírgula ou ponto e vírgula).
             </p>
             
             <Button 
@@ -209,13 +234,10 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
           )}
 
           <div className="text-xs text-gray-500">
-            <p><strong>Campos aceitos (flexível):</strong></p>
-            <p>• Data: date, data, d</p>
-            <p>• Tipo: type, tipo, t</p>
-            <p>• Descrição: description, descricao, desc</p>
-            <p>• Valor: amount, valor, v</p>
-            <p>• Categoria: category, categoria, cat</p>
-            <p>• Banco: bank, banco, b</p>
+            <p><strong>Formatos aceitos:</strong></p>
+            <p>• Separadores: vírgula (,) ou ponto e vírgula (;)</p>
+            <p>• Valores: "R$ 100,50" ou "100.50"</p>
+            <p>• Campos: date, type, description, amount, category, bank</p>
             <p className="mt-2 text-green-600">✓ Dados incompletos serão preenchidos automaticamente</p>
           </div>
 
