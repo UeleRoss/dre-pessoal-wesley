@@ -55,9 +55,12 @@ const CategoryManager = () => {
   // Mutation para adicionar categoria personalizada
   const addCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase
         .from('categories')
-        .insert([{ name, user_id: (await supabase.auth.getUser()).data.user?.id }])
+        .insert([{ name, user_id: user.data.user.id }])
         .select()
         .single();
       
