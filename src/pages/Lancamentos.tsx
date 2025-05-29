@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Plus, Filter, Download, Edit, Trash2, Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -112,24 +111,37 @@ const Lancamentos = () => {
     const confirmMessage = `Tem certeza que deseja excluir ${selectedItems.size} lançamento(s) selecionado(s)?`;
     if (!confirm(confirmMessage)) return;
     
-    const { error } = await supabase
-      .from('financial_items')
-      .delete()
-      .in('id', Array.from(selectedItems));
-    
-    if (error) {
+    try {
+      // Convert Set to Array for the query
+      const itemsToDelete = Array.from(selectedItems);
+      
+      const { error } = await supabase
+        .from('financial_items')
+        .delete()
+        .in('id', itemsToDelete);
+      
+      if (error) {
+        console.error('Erro ao excluir lançamentos:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir lançamentos: " + error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sucesso",
+          description: `${selectedItems.size} lançamento(s) excluído(s) com sucesso`,
+        });
+        setSelectedItems(new Set());
+        refetch();
+      }
+    } catch (error) {
+      console.error('Erro inesperado:', error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir lançamentos",
+        description: "Erro inesperado ao excluir lançamentos",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: `${selectedItems.size} lançamento(s) excluído(s) com sucesso`,
-      });
-      setSelectedItems(new Set());
-      refetch();
     }
   };
 
