@@ -17,11 +17,11 @@ const Dashboard = () => {
 
   // Mock data - will be replaced with real data later
   const bankBalances = [
-    { name: "CONTA SIMPLES", balance: 15420.50, previousBalance: 12300.00 },
-    { name: "BRADESCO", balance: 8750.30, previousBalance: 9200.00 },
-    { name: "C6 BANK", balance: 12340.80, previousBalance: 11800.00 },
-    { name: "ASAAS", balance: 5680.20, previousBalance: 4900.00 },
-    { name: "NOMAD", balance: 3240.15, previousBalance: 3100.00 },
+    { name: "CONTA SIMPLES", balance: 2540.50, previousBalance: 2300.00 },
+    { name: "BRADESCO", balance: 1750.30, previousBalance: 1900.00 },
+    { name: "C6 BANK", balance: 3240.80, previousBalance: 2800.00 },
+    { name: "ASAAS", balance: 980.20, previousBalance: 900.00 },
+    { name: "NOMAD", balance: 640.15, previousBalance: 600.00 },
   ];
 
   const totalBalance = bankBalances.reduce((sum, bank) => sum + bank.balance, 0);
@@ -29,11 +29,11 @@ const Dashboard = () => {
 
   // Mock financial data
   const monthlyData = {
-    totalRevenue: 45800.00,
-    totalExpenses: 32150.00,
-    netProfit: 13650.00,
-    contributionMargin: 29.80, // percentage
-    marginWithoutInvestments: 35.20, // percentage
+    totalRevenue: 12800.00,
+    totalExpenses: 8150.00,
+    netProfit: 4650.00,
+    contributionMargin: 36.30, // percentage
+    marginWithoutInvestments: 42.20, // percentage
   };
 
   return (
@@ -44,10 +44,40 @@ const Dashboard = () => {
         onMonthChange={setSelectedMonth}
       />
 
+      {/* Quick Actions */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-semibold text-navy-800 mb-4">Ações Rápidas</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors duration-200">
+            <div className="text-center">
+              <DollarSign className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+              <p className="font-medium text-navy-800">Novo Lançamento</p>
+              <p className="text-sm text-navy-500">Registrar receita/despesa</p>
+            </div>
+          </button>
+          
+          <button className="p-4 bg-navy-50 hover:bg-navy-100 rounded-lg border border-navy-200 transition-colors duration-200">
+            <div className="text-center">
+              <TrendingUp className="h-8 w-8 text-navy-600 mx-auto mb-2" />
+              <p className="font-medium text-navy-800">Ver Análises</p>
+              <p className="text-sm text-navy-500">Relatórios e gráficos</p>
+            </div>
+          </button>
+          
+          <button className="p-4 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors duration-200">
+            <div className="text-center">
+              <Target className="h-8 w-8 text-green-600 mx-auto mb-2" />
+              <p className="font-medium text-navy-800">Contas Fixas</p>
+              <p className="text-sm text-navy-500">Gerenciar recorrências</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* Bank Balances Section */}
       <div>
         <h2 className="text-2xl font-bold text-navy-800 mb-4">Saldos por Banco</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           {bankBalances.map((bank) => (
             <BankCard
               key={bank.name}
@@ -115,41 +145,11 @@ const Dashboard = () => {
           
           <SummaryCard
             title="Resultado Investimentos"
-            value={8950.00}
+            value={2950.00}
             subtitle="Aportes do mês"
             icon={PiggyBank}
             trend="up"
           />
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-navy-800 mb-4">Ações Rápidas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors duration-200">
-            <div className="text-center">
-              <DollarSign className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-              <p className="font-medium text-navy-800">Novo Lançamento</p>
-              <p className="text-sm text-navy-500">Registrar receita/despesa</p>
-            </div>
-          </button>
-          
-          <button className="p-4 bg-navy-50 hover:bg-navy-100 rounded-lg border border-navy-200 transition-colors duration-200">
-            <div className="text-center">
-              <TrendingUp className="h-8 w-8 text-navy-600 mx-auto mb-2" />
-              <p className="font-medium text-navy-800">Ver Análises</p>
-              <p className="text-sm text-navy-500">Relatórios e gráficos</p>
-            </div>
-          </button>
-          
-          <button className="p-4 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors duration-200">
-            <div className="text-center">
-              <Target className="h-8 w-8 text-green-600 mx-auto mb-2" />
-              <p className="font-medium text-navy-800">Contas Fixas</p>
-              <p className="text-sm text-navy-500">Gerenciar recorrências</p>
-            </div>
-          </button>
         </div>
       </div>
     </div>
