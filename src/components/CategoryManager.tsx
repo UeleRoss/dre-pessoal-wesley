@@ -27,9 +27,10 @@ interface CategoryManagerProps {
 const CategoryManager = ({ userId }: CategoryManagerProps) => {
   const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ old: string; new: string } | null>(null);
+  const [localCategories, setLocalCategories] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const { data: categories = [], refetch } = useQuery({
+  const { data: dbCategories = [], refetch } = useQuery({
     queryKey: ['categories', userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -43,10 +44,13 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
     enabled: !!userId
   });
 
+  // Combina categorias do banco com categorias locais
+  const allCategories = [...new Set([...dbCategories, ...localCategories])];
+
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
     
-    if (categories.includes(newCategory)) {
+    if (allCategories.includes(newCategory)) {
       toast({
         title: "Erro",
         description: "Esta categoria já existe",
@@ -55,7 +59,10 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
       return;
     }
 
+    // Adiciona a categoria localmente para aparecer imediatamente
+    setLocalCategories(prev => [...prev, newCategory]);
     setNewCategory("");
+    
     toast({
       title: "Sucesso",
       description: "Categoria adicionada! Você pode usá-la em novos lançamentos",
@@ -78,6 +85,11 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
         variant: "destructive",
       });
     } else {
+      // Atualiza também as categorias locais se necessário
+      setLocalCategories(prev => 
+        prev.map(cat => cat === editingCategory.old ? editingCategory.new : cat)
+      );
+      
       toast({
         title: "Sucesso",
         description: "Categoria editada com sucesso",
@@ -88,6 +100,17 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
   };
 
   const handleDeleteCategory = async (category: string) => {
+    // Se é uma categoria local (não tem lançamentos), remove apenas localmente
+    if (!dbCategories.includes(category)) {
+      setLocalCategories(prev => prev.filter(cat => cat !== category));
+      toast({
+        title: "Sucesso",
+        description: "Categoria removida",
+      });
+      return;
+    }
+
+    // Se tem lançamentos, deleta do banco
     const { error } = await supabase
       .from('financial_items')
       .delete()
@@ -129,7 +152,7 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
         </div>
         
         <div className="space-y-2">
-          {categories.map((category) => (
+          {allCategories.map((category) => (
             <div key={category} className="flex items-center justify-between p-2 border rounded">
               {editingCategory?.old === category ? (
                 <div className="flex gap-2 flex-1">
@@ -145,7 +168,12 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
                 </div>
               ) : (
                 <>
-                  <Badge variant="outline">{category}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{category}</Badge>
+                    {!dbCategories.includes(category) && (
+                      <Badge variant="secondary" className="text-xs">Nova</Badge>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -164,7 +192,10 @@ const CategoryManager = ({ userId }: CategoryManagerProps) => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Excluir Categoria</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Isso excluirá a categoria "{category}" e TODOS os lançamentos associados a ela. Esta ação não pode ser desfeita.
+                            {dbCategories.includes(category) 
+                              ? `Isso excluirá a categoria "${category}" e TODOS os lançamentos associados a ela. Esta ação não pode ser desfeita.`
+                              : `Isso excluirá a categoria "${category}". Esta ação não pode ser desfeita.`
+                            }
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

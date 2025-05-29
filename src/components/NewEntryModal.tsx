@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
 interface NewEntryModalProps {
@@ -26,7 +26,27 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const { toast } = useToast();
 
   const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
-  const categories = [
+  
+  // Busca categorias existentes do usuário
+  const { data: userCategories = [] } = useQuery({
+    queryKey: ['user-categories'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('category')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      return [...new Set(data.map(item => item.category))];
+    },
+    enabled: isOpen
+  });
+
+  // Categorias padrão + categorias do usuário
+  const defaultCategories = [
     'Alimentação',
     'Transporte',
     'Moradia',
@@ -41,6 +61,9 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     'Vendas',
     'Outros'
   ];
+
+  const allCategories = [...new Set([...defaultCategories, ...userCategories])].sort();
+
   const types = [
     { value: 'entrada', label: 'Entrada' },
     { value: 'saida', label: 'Saída' },
@@ -162,7 +185,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(category => (
+                  {allCategories.map(category => (
                     <SelectItem key={category} value={category}>
                       {category}
                     </SelectItem>
