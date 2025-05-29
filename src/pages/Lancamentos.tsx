@@ -309,7 +309,7 @@ const Lancamentos = () => {
       <NewEntryModal
         isOpen={isNewEntryModalOpen}
         onClose={() => setIsNewEntryModalOpen(false)}
-        onEntryAdded={() => {
+        onSuccess={() => {
           refetch();
           setIsNewEntryModalOpen(false);
         }}
