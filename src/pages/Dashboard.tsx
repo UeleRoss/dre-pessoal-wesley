@@ -93,20 +93,30 @@ const Dashboard = () => {
     return <Auth onAuthChange={setUser} />;
   }
 
-  // Calcular saldos atuais dos bancos
+  // Calcular saldos atuais dos bancos considerando apenas lançamentos após configuração
   const calculateBankBalances = () => {
     const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
     return banks.map(bank => {
       // Saldo inicial configurado
-      const initialBalance = bankBalances.find(b => b.bank_name === bank)?.initial_balance || 0;
+      const bankConfig = bankBalances.find(b => b.bank_name === bank);
+      const initialBalance = bankConfig?.initial_balance || 0;
       
-      // Movimentações deste banco no mês
-      const bankItems = financialItems.filter(item => item.bank === bank);
+      // Data de configuração do saldo (usar updated_at como referência)
+      const configDate = bankConfig?.updated_at;
+      
+      // Movimentações deste banco no mês, considerando apenas após a configuração
+      let bankItems = financialItems.filter(item => item.bank === bank);
+      
+      // Se há data de configuração, filtrar apenas lançamentos posteriores
+      if (configDate) {
+        bankItems = bankItems.filter(item => item.created_at > configDate);
+      }
+      
       const monthMovement = bankItems.reduce((sum, item) => {
         return item.type === 'entrada' ? sum + item.amount : sum - item.amount;
       }, 0);
       
-      // Saldo atual = saldo inicial + movimentações
+      // Saldo atual = saldo inicial + movimentações após configuração
       const currentBalance = initialBalance + monthMovement;
       
       return {

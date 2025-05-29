@@ -36,10 +36,14 @@ const BankBalanceManager = () => {
       const user = await supabase.auth.getUser();
       if (!user.data.user) throw new Error('Usuário não autenticado');
 
+      // Data atual será a nova data de referência para os cálculos
+      const configDate = new Date().toISOString();
+
       const updates = Object.entries(bankBalances).map(([bank, balance]) => ({
         user_id: user.data.user.id,
         bank_name: bank,
-        initial_balance: balance
+        initial_balance: balance,
+        updated_at: configDate // Usar como data de referência
       }));
 
       // Usar upsert para inserir ou atualizar
@@ -56,8 +60,8 @@ const BankBalanceManager = () => {
       queryClient.invalidateQueries({ queryKey: ['bank-balances'] });
       queryClient.invalidateQueries({ queryKey: ['financial-items'] });
       toast({
-        title: "Saldos salvos",
-        description: "Saldos iniciais dos bancos atualizados com sucesso!",
+        title: "Saldos configurados",
+        description: "Saldos iniciais atualizados! A partir de agora, apenas novos lançamentos serão considerados.",
       });
     },
     onError: () => {
@@ -112,9 +116,12 @@ const BankBalanceManager = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-gray-600">
-          Configure o saldo inicial de cada banco. Este valor será usado como base para calcular os saldos atuais baseados nos lançamentos.
-        </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <p className="text-sm text-amber-800">
+            <strong>Importante:</strong> Ao configurar estes saldos, o sistema irá ignorar todos os lançamentos anteriores. 
+            A partir desta configuração, apenas os novos lançamentos que você fizer serão considerados no cálculo dos saldos.
+          </p>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {BANKS.map((bank) => (
@@ -143,7 +150,7 @@ const BankBalanceManager = () => {
             className="flex-1"
           >
             <Save className="h-4 w-4 mr-2" />
-            Salvar Saldos
+            Configurar Saldos
           </Button>
           <Button 
             variant="outline" 
