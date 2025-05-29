@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Plus, Trash2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,14 +64,14 @@ const BankManager = () => {
       
       console.log('Adicionando banco:', bankName);
       
-      // Criar um lançamento fictício apenas para adicionar o banco ao sistema
+      // Criar um lançamento simples para adicionar o banco ao sistema
       const { data, error } = await supabase
         .from('financial_items')
         .insert([{
           description: `Configuração inicial - ${bankName}`,
           amount: 0,
           type: 'entrada',
-          category: 'Configuração',
+          category: 'Carro', // Usando uma categoria que existe
           bank: bankName,
           date: new Date().toISOString().split('T')[0],
           user_id: user.id,
