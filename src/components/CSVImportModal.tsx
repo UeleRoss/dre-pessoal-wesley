@@ -60,6 +60,72 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     }).filter(Boolean);
   };
 
+  const parseDate = (dateStr: string): string => {
+    console.log('Parsing date:', dateStr);
+    
+    // Se não há data, usa data atual
+    if (!dateStr || dateStr.trim() === '') {
+      const today = new Date().toISOString().split('T')[0];
+      console.log('Data vazia, usando data atual:', today);
+      return today;
+    }
+
+    // Remove espaços e caracteres especiais
+    const cleanDate = dateStr.trim();
+    
+    // Verifica se já está no formato YYYY-MM-DD
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoDateRegex.test(cleanDate)) {
+      // Valida se a data é válida
+      const testDate = new Date(cleanDate);
+      if (!isNaN(testDate.getTime())) {
+        console.log('Data válida no formato ISO:', cleanDate);
+        return cleanDate;
+      }
+    }
+
+    // Tenta diferentes formatos de data
+    const formats = [
+      // DD/MM/YYYY ou DD/MM/YY
+      /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/,
+      // DD-MM-YYYY ou DD-MM-YY
+      /^(\d{1,2})-(\d{1,2})-(\d{2,4})$/,
+      // MM/DD/YYYY ou MM/DD/YY
+      /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/
+    ];
+
+    for (const format of formats) {
+      const match = cleanDate.match(format);
+      if (match) {
+        let [, part1, part2, year] = match;
+        
+        // Ajusta o ano se for de 2 dígitos
+        if (year.length === 2) {
+          const yearNum = parseInt(year);
+          year = yearNum > 50 ? `19${year}` : `20${year}`;
+        }
+
+        // Assume formato DD/MM/YYYY para datas brasileiras
+        const day = part1.padStart(2, '0');
+        const month = part2.padStart(2, '0');
+        
+        const formattedDate = `${year}-${month}-${day}`;
+        
+        // Valida a data
+        const testDate = new Date(formattedDate);
+        if (!isNaN(testDate.getTime())) {
+          console.log('Data convertida de', cleanDate, 'para', formattedDate);
+          return formattedDate;
+        }
+      }
+    }
+
+    // Se não conseguiu converter, usa data atual
+    const fallbackDate = new Date().toISOString().split('T')[0];
+    console.log('Não foi possível converter a data', cleanDate, ', usando data atual:', fallbackDate);
+    return fallbackDate;
+  };
+
   const handleImport = async () => {
     if (!file) return;
     
@@ -80,7 +146,9 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       for (const record of records) {
         try {
           // Mapeamento flexível dos campos
-          const date = record.date || record.data || record.d || new Date().toISOString().split('T')[0];
+          const dateStr = record.date || record.data || record.d || '';
+          const validDate = parseDate(dateStr);
+          
           let type = (record.type || record.tipo || record.t || 'entrada').toLowerCase().trim();
           const description = record.description || record.descricao || record.desc || 'Sem descrição';
           
@@ -104,27 +172,12 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             type = 'entrada';
           }
           
-          console.log('Processando registro:', { date, type, description, amount, category, bank });
+          console.log('Processando registro:', { date: validDate, type, description, amount, category, bank });
           
           // Validação básica
           if (amount === 0 || isNaN(amount)) {
             console.log('Ignorando linha com valor inválido:', record);
             continue;
-          }
-
-          // Validação de data
-          let validDate = date;
-          if (!date || date === '') {
-            validDate = new Date().toISOString().split('T')[0];
-          } else {
-            // Tenta converter diferentes formatos de data
-            const dateObj = new Date(date);
-            if (isNaN(dateObj.getTime())) {
-              console.log('Data inválida, usando data atual:', date);
-              validDate = new Date().toISOString().split('T')[0];
-            } else {
-              validDate = dateObj.toISOString().split('T')[0];
-            }
           }
 
           const financialItem = {
@@ -185,7 +238,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   };
 
   const downloadTemplate = () => {
-    const template = "date;type;description;amount;category;bank\n2024-01-01;entrada;Salário;5000,00;Trabalho;CONTA SIMPLES\n2024-01-02;saida;Compras;150,75;Alimentação;BRADESCO\n2024-01-03;transferencia;PIX;200,00;Transferência;C6 BANK";
+    const template = "date;type;description;amount;category;bank\n2025-02-05;entrada;Salário;5000,00;Trabalho;CONTA SIMPLES\n2025-02-06;saida;Compras;150,75;Alimentação;BRADESCO\n2025-02-07;transferencia;PIX;200,00;Transferência;C6 BANK";
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -246,6 +299,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             <p><strong>Formatos aceitos:</strong></p>
             <p>• Separadores: vírgula (,) ou ponto e vírgula (;)</p>
             <p>• Valores: "R$ 100,50" ou "100.50"</p>
+            <p>• Datas: "2025-02-05", "05/02/2025" ou "05-02-2025"</p>
             <p>• Campos: date, type, description, amount, category, bank</p>
             <p>• Tipos: "entrada", "saida", "transferencia"</p>
             <p className="mt-2 text-green-600">✓ Dados incompletos serão preenchidos automaticamente</p>
