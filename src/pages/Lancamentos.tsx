@@ -73,9 +73,9 @@ const Lancamentos = () => {
     return <Auth onAuthChange={setUser} />;
   }
 
-  // Get unique values for filters
-  const uniqueBanks = [...new Set(financialItems.map(item => item.bank))];
-  const uniqueCategories = [...new Set(financialItems.map(item => item.category))];
+  // Get unique values for filters - filter out empty strings
+  const uniqueBanks = [...new Set(financialItems.map(item => item.bank))].filter(bank => bank && bank.trim() !== '');
+  const uniqueCategories = [...new Set(financialItems.map(item => item.category))].filter(category => category && category.trim() !== '');
   
   // Get unique months from financial items
   const uniqueMonths = [...new Set(financialItems.map(item => {
@@ -392,7 +392,7 @@ const Lancamentos = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os bancos</SelectItem>
-                {[...new Set(financialItems.map(item => item.bank))].map(bank => (
+                {uniqueBanks.map(bank => (
                   <SelectItem key={bank} value={bank}>{bank}</SelectItem>
                 ))}
               </SelectContent>
@@ -404,7 +404,7 @@ const Lancamentos = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as categorias</SelectItem>
-                {[...new Set(financialItems.map(item => item.category))].map(category => (
+                {uniqueCategories.map(category => (
                   <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}
               </SelectContent>
