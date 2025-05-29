@@ -280,11 +280,6 @@ const Lancamentos = () => {
                 <Checkbox
                   checked={allFilteredSelected}
                   onCheckedChange={handleSelectAll}
-                  ref={(el) => {
-                    if (el) {
-                      el.indeterminate = someFilteredSelected && !allFilteredSelected;
-                    }
-                  }}
                 />
                 <span className="text-sm text-gray-600">
                   Selecionar todos
@@ -327,11 +322,6 @@ const Lancamentos = () => {
                       <Checkbox
                         checked={allFilteredSelected}
                         onCheckedChange={handleSelectAll}
-                        ref={(el) => {
-                          if (el) {
-                            el.indeterminate = someFilteredSelected && !allFilteredSelected;
-                          }
-                        }}
                       />
                     </TableHead>
                     <TableHead>Data</TableHead>
