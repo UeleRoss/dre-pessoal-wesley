@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { Plus, Filter, Download, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Filter, Download, Edit, Trash2, Search, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +11,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import NewEntryModal from "@/components/NewEntryModal";
+import EditEntryModal from "@/components/EditEntryModal";
+import BankManager from "@/components/BankManager";
+import CategoryManager from "@/components/CategoryManager";
 import Auth from "@/components/Auth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const Lancamentos = () => {
   const [user, setUser] = useState<any>(null);
@@ -20,6 +32,8 @@ const Lancamentos = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
+  const [isEditEntryModalOpen, setIsEditEntryModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
@@ -142,6 +156,11 @@ const Lancamentos = () => {
     }
   };
 
+  const handleEdit = (item: any) => {
+    setEditingItem(item);
+    setIsEditEntryModalOpen(true);
+  };
+
   const exportToCSV = () => {
     const headers = ['Data', 'Descrição', 'Tipo', 'Categoria', 'Banco', 'Valor'];
     const csvContent = [
@@ -166,7 +185,6 @@ const Lancamentos = () => {
   };
 
   const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItems.has(item.id));
-  const someFilteredSelected = filteredItems.some(item => selectedItems.has(item.id));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -177,6 +195,27 @@ const Lancamentos = () => {
         </div>
         
         <div className="flex flex-wrap gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Configurações
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Configurações</SheetTitle>
+                <SheetDescription>
+                  Gerencie bancos e categorias
+                </SheetDescription>
+              </SheetHeader>
+              <div className="space-y-6 mt-6">
+                <BankManager userId={user.id} />
+                <CategoryManager userId={user.id} />
+              </div>
+            </SheetContent>
+          </Sheet>
+          
           <Button 
             className="bg-orange-500 hover:bg-orange-600"
             onClick={() => setIsNewEntryModalOpen(true)}
@@ -372,6 +411,14 @@ const Lancamentos = () => {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleEdit(item)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDelete(item.id)}
                             className="text-red-600 hover:text-red-800"
                           >
@@ -395,6 +442,17 @@ const Lancamentos = () => {
           refetch();
           setIsNewEntryModalOpen(false);
         }}
+      />
+
+      <EditEntryModal
+        isOpen={isEditEntryModalOpen}
+        onClose={() => setIsEditEntryModalOpen(false)}
+        onSuccess={() => {
+          refetch();
+          setIsEditEntryModalOpen(false);
+        }}
+        item={editingItem}
+        userId={user.id}
       />
     </div>
   );
