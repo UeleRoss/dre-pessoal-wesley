@@ -1,43 +1,134 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import MonthSelector from "@/components/MonthSelector";
 import BankCard from "@/components/BankCard";
 import SummaryCard from "@/components/SummaryCard";
+import Auth from "@/components/Auth";
+import NewEntryModal from "@/components/NewEntryModal";
+import CSVImportModal from "@/components/CSVImportModal";
 import { 
   DollarSign, 
   TrendingUp, 
   TrendingDown, 
   Percent,
   PiggyBank,
-  Target
+  Target,
+  LogOut,
+  Upload
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [user, setUser] = useState<any>(null);
+  const [showNewEntryModal, setShowNewEntryModal] = useState(false);
+  const [showCSVModal, setShowCSVModal] = useState(false);
+  const { toast } = useToast();
 
-  // Mock data - will be replaced with real data later
-  const bankBalances = [
-    { name: "CONTA SIMPLES", balance: 2540.50, previousBalance: 2300.00 },
-    { name: "BRADESCO", balance: 1750.30, previousBalance: 1900.00 },
-    { name: "C6 BANK", balance: 3240.80, previousBalance: 2800.00 },
-    { name: "ASAAS", balance: 980.20, previousBalance: 900.00 },
-    { name: "NOMAD", balance: 640.15, previousBalance: 600.00 },
-  ];
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
 
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const { data: financialItems = [], refetch } = useQuery({
+    queryKey: ['financial-items', selectedMonth.getMonth(), selectedMonth.getFullYear()],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+      const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('*')
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0]);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user
+  });
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Logout realizado",
+      description: "Até logo!",
+    });
+  };
+
+  if (!user) {
+    return <Auth onAuthChange={setUser} />;
+  }
+
+  // Calculate balances and summaries from real data
+  const calculateBankBalances = () => {
+    const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
+    return banks.map(bank => {
+      const bankItems = financialItems.filter(item => item.bank === bank);
+      const balance = bankItems.reduce((sum, item) => {
+        return item.type === 'entrada' ? sum + item.amount : sum - item.amount;
+      }, 0);
+      
+      return {
+        name: bank,
+        balance,
+        previousBalance: balance * 0.9 // Mock previous balance
+      };
+    });
+  };
+
+  const calculateMonthlyData = () => {
+    const totalRevenue = financialItems
+      .filter(item => item.type === 'entrada')
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    const totalExpenses = financialItems
+      .filter(item => item.type === 'saida')
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    const netProfit = totalRevenue - totalExpenses;
+    const contributionMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    return {
+      totalRevenue,
+      totalExpenses,
+      netProfit,
+      contributionMargin,
+      marginWithoutInvestments: contributionMargin * 1.1,
+    };
+  };
+
+  const bankBalances = calculateBankBalances();
   const totalBalance = bankBalances.reduce((sum, bank) => sum + bank.balance, 0);
   const previousTotalBalance = bankBalances.reduce((sum, bank) => sum + (bank.previousBalance || 0), 0);
-
-  // Mock financial data
-  const monthlyData = {
-    totalRevenue: 12800.00,
-    totalExpenses: 8150.00,
-    netProfit: 4650.00,
-    contributionMargin: 36.30, // percentage
-    marginWithoutInvestments: 42.20, // percentage
-  };
+  const monthlyData = calculateMonthlyData();
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Header with logout */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-navy-800">Bem-vindo!</h1>
+          <p className="text-navy-600">{user.email}</p>
+        </div>
+        <Button variant="outline" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Sair
+        </Button>
+      </div>
+
       {/* Month Selector */}
       <MonthSelector 
         selectedMonth={selectedMonth}
@@ -47,12 +138,26 @@ const Dashboard = () => {
       {/* Quick Actions */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h3 className="text-lg font-semibold text-navy-800 mb-4">Ações Rápidas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors duration-200">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <button 
+            onClick={() => setShowNewEntryModal(true)}
+            className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors duration-200"
+          >
             <div className="text-center">
               <DollarSign className="h-8 w-8 text-orange-600 mx-auto mb-2" />
               <p className="font-medium text-navy-800">Novo Lançamento</p>
               <p className="text-sm text-navy-500">Registrar receita/despesa</p>
+            </div>
+          </button>
+          
+          <button 
+            onClick={() => setShowCSVModal(true)}
+            className="p-4 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors duration-200"
+          >
+            <div className="text-center">
+              <Upload className="h-8 w-8 text-green-600 mx-auto mb-2" />
+              <p className="font-medium text-navy-800">Importar CSV</p>
+              <p className="text-sm text-navy-500">Dados dos últimos 2 anos</p>
             </div>
           </button>
           
@@ -64,9 +169,9 @@ const Dashboard = () => {
             </div>
           </button>
           
-          <button className="p-4 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors duration-200">
+          <button className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors duration-200">
             <div className="text-center">
-              <Target className="h-8 w-8 text-green-600 mx-auto mb-2" />
+              <Target className="h-8 w-8 text-blue-600 mx-auto mb-2" />
               <p className="font-medium text-navy-800">Contas Fixas</p>
               <p className="text-sm text-navy-500">Gerenciar recorrências</p>
             </div>
@@ -77,7 +182,7 @@ const Dashboard = () => {
       {/* Bank Balances Section */}
       <div>
         <h2 className="text-2xl font-bold text-navy-800 mb-4">Saldos por Banco</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           {bankBalances.map((bank) => (
             <BankCard
               key={bank.name}
@@ -122,7 +227,7 @@ const Dashboard = () => {
             value={monthlyData.netProfit}
             subtitle="Resultado do mês"
             icon={TrendingUp}
-            trend="up"
+            trend={monthlyData.netProfit >= 0 ? "up" : "down"}
           />
           
           <SummaryCard
@@ -152,6 +257,19 @@ const Dashboard = () => {
           />
         </div>
       </div>
+
+      {/* Modals */}
+      <NewEntryModal
+        isOpen={showNewEntryModal}
+        onClose={() => setShowNewEntryModal(false)}
+        onSuccess={refetch}
+      />
+
+      <CSVImportModal
+        isOpen={showCSVModal}
+        onClose={() => setShowCSVModal(false)}
+        onSuccess={refetch}
+      />
     </div>
   );
 };

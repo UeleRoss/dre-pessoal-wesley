@@ -9,7 +9,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      financial_items: {
+        Row: {
+          amount: number
+          bank: string
+          category: string
+          created_at: string
+          date: string
+          description: string
+          id: string
+          source: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bank: string
+          category: string
+          created_at?: string
+          date: string
+          description: string
+          id?: string
+          source?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bank?: string
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+          source?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recurring_bills: {
+        Row: {
+          bank: string
+          category: string
+          created_at: string
+          due_date: number
+          id: string
+          name: string
+          paid_this_month: boolean
+          recurring: boolean
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          bank: string
+          category: string
+          created_at?: string
+          due_date: number
+          id?: string
+          name: string
+          paid_this_month?: boolean
+          recurring?: boolean
+          updated_at?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          bank?: string
+          category?: string
+          created_at?: string
+          due_date?: number
+          id?: string
+          name?: string
+          paid_this_month?: boolean
+          recurring?: boolean
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
