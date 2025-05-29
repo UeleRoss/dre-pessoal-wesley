@@ -5,7 +5,7 @@ import { BarChart3, TrendingUp, PieChart, Calendar, DollarSign } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart as RechartsPieChart, Cell, LineChart, Line, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart as RechartsPieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from "recharts";
 import MonthSelector from "@/components/MonthSelector";
 import Auth from "@/components/Auth";
 
@@ -250,11 +250,11 @@ const Analise = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <RechartsPieChart data={categoryData} cx="50%" cy="50%" outerRadius={120} fill="#8884d8" dataKey="value">
+                    <Pie data={categoryData} cx="50%" cy="50%" outerRadius={120} dataKey="value">
                       {categoryData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
-                    </RechartsPieChart>
+                    </Pie>
                   </RechartsPieChart>
                 </ResponsiveContainer>
               </div>
