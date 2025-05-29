@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Plus, Filter, Download, Edit, Trash2, Search, Settings, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const Lancamentos = () => {
   const [selectedBank, setSelectedBank] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("all");
   const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
   const [isEditEntryModalOpen, setIsEditEntryModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -74,6 +76,12 @@ const Lancamentos = () => {
   // Get unique values for filters
   const uniqueBanks = [...new Set(financialItems.map(item => item.bank))];
   const uniqueCategories = [...new Set(financialItems.map(item => item.category))];
+  
+  // Get unique months from financial items
+  const uniqueMonths = [...new Set(financialItems.map(item => {
+    const date = new Date(item.date);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }))].sort().reverse();
 
   // Filter and sort items
   const filteredAndSortedItems = financialItems
@@ -86,7 +94,11 @@ const Lancamentos = () => {
       const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
       const matchesType = selectedType === "all" || item.type === selectedType;
       
-      return matchesSearch && matchesBank && matchesCategory && matchesType;
+      const itemMonth = new Date(item.date);
+      const itemMonthStr = `${itemMonth.getFullYear()}-${String(itemMonth.getMonth() + 1).padStart(2, '0')}`;
+      const matchesMonth = selectedMonth === "all" || itemMonthStr === selectedMonth;
+      
+      return matchesSearch && matchesBank && matchesCategory && matchesType && matchesMonth;
     })
     .sort((a, b) => {
       if (!sortField) return 0;
@@ -277,6 +289,16 @@ const Lancamentos = () => {
 
   const allFilteredSelected = filteredAndSortedItems.length > 0 && filteredAndSortedItems.every(item => selectedItems.has(item.id));
 
+  // Função para formatar mês/ano para exibição
+  const formatMonthYear = (monthStr: string) => {
+    const [year, month] = monthStr.split('-');
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return `${monthNames[parseInt(month) - 1]} ${year}`;
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -339,7 +361,7 @@ const Lancamentos = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -349,6 +371,20 @@ const Lancamentos = () => {
                 className="pl-10"
               />
             </div>
+            
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os meses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
+                {uniqueMonths.map(month => (
+                  <SelectItem key={month} value={month}>
+                    {formatMonthYear(month)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
             <Select value={selectedBank} onValueChange={setSelectedBank}>
               <SelectTrigger>
@@ -389,6 +425,7 @@ const Lancamentos = () => {
               variant="outline" 
               onClick={() => {
                 setSearchTerm("");
+                setSelectedMonth("all");
                 setSelectedBank("all");
                 setSelectedCategory("all");
                 setSelectedType("all");
@@ -429,12 +466,12 @@ const Lancamentos = () => {
               </div>
               <h3 className="text-xl font-semibold text-navy-800 mb-2">Nenhum lançamento encontrado</h3>
               <p className="text-navy-600 mb-6">
-                {searchTerm || selectedBank !== "all" || selectedCategory !== "all" || selectedType !== "all" 
+                {searchTerm || selectedMonth !== "all" || selectedBank !== "all" || selectedCategory !== "all" || selectedType !== "all" 
                   ? "Tente ajustar os filtros para ver mais resultados."
                   : "Comece criando seu primeiro lançamento financeiro."
                 }
               </p>
-              {!(searchTerm || selectedBank !== "all" || selectedCategory !== "all" || selectedType !== "all") && (
+              {!(searchTerm || selectedMonth !== "all" || selectedBank !== "all" || selectedCategory !== "all" || selectedType !== "all") && (
                 <Button 
                   className="bg-orange-500 hover:bg-orange-600"
                   onClick={() => setIsNewEntryModalOpen(true)}
