@@ -112,31 +112,49 @@ const Lancamentos = () => {
     if (!confirm(confirmMessage)) return;
     
     try {
-      // Convert Set to Array for the query
-      const itemsToDelete = Array.from(selectedItems);
+      console.log('Iniciando exclusão em lote...');
+      console.log('Items selecionados:', Array.from(selectedItems));
       
-      const { error } = await supabase
-        .from('financial_items')
-        .delete()
-        .in('id', itemsToDelete);
+      // Fazer exclusões uma por uma para evitar problemas com a consulta
+      let deletedCount = 0;
+      let errorCount = 0;
       
-      if (error) {
-        console.error('Erro ao excluir lançamentos:', error);
+      for (const itemId of selectedItems) {
+        console.log(`Excluindo item: ${itemId}`);
+        
+        const { error } = await supabase
+          .from('financial_items')
+          .delete()
+          .eq('id', itemId)
+          .eq('user_id', user.id); // Garantir que só exclua items do usuário atual
+        
+        if (error) {
+          console.error(`Erro ao excluir item ${itemId}:`, error);
+          errorCount++;
+        } else {
+          console.log(`Item ${itemId} excluído com sucesso`);
+          deletedCount++;
+        }
+      }
+      
+      if (errorCount > 0) {
         toast({
-          title: "Erro",
-          description: "Erro ao excluir lançamentos: " + error.message,
+          title: "Atenção",
+          description: `${deletedCount} lançamento(s) excluído(s), ${errorCount} falharam`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Sucesso",
-          description: `${selectedItems.size} lançamento(s) excluído(s) com sucesso`,
+          description: `${deletedCount} lançamento(s) excluído(s) com sucesso`,
         });
-        setSelectedItems(new Set());
-        refetch();
       }
+      
+      setSelectedItems(new Set());
+      refetch();
+      
     } catch (error) {
-      console.error('Erro inesperado:', error);
+      console.error('Erro inesperado na exclusão em lote:', error);
       toast({
         title: "Erro",
         description: "Erro inesperado ao excluir lançamentos",
@@ -148,23 +166,37 @@ const Lancamentos = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este lançamento?")) return;
     
-    const { error } = await supabase
-      .from('financial_items')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
+    try {
+      console.log(`Excluindo item individual: ${id}`);
+      
+      const { error } = await supabase
+        .from('financial_items')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id); // Garantir que só exclua items do usuário atual
+      
+      if (error) {
+        console.error('Erro ao excluir lançamento:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir lançamento: " + error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log('Lançamento excluído com sucesso');
+        toast({
+          title: "Sucesso",
+          description: "Lançamento excluído com sucesso",
+        });
+        refetch();
+      }
+    } catch (error) {
+      console.error('Erro inesperado:', error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir lançamento",
+        description: "Erro inesperado ao excluir lançamento",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Sucesso",
-        description: "Lançamento excluído com sucesso",
-      });
-      refetch();
     }
   };
 
