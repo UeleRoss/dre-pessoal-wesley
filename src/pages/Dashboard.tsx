@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import MonthSelector from "@/components/MonthSelector";
@@ -81,6 +80,25 @@ const Dashboard = () => {
     enabled: !!user
   });
 
+  // Buscar todos os bancos únicos que o usuário possui
+  const { data: availableBanks = [] } = useQuery({
+    queryKey: ['available-banks', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const uniqueBanks = [...new Set(data.map(item => item.bank))];
+      return uniqueBanks;
+    },
+    enabled: !!user?.id
+  });
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
@@ -95,8 +113,8 @@ const Dashboard = () => {
 
   // Calcular saldos atuais dos bancos considerando apenas lançamentos após configuração
   const calculateBankBalances = () => {
-    const banks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
-    return banks.map(bank => {
+    // Usar bancos dinâmicos do banco de dados em vez de lista hardcoded
+    return availableBanks.map(bank => {
       // Saldo inicial configurado
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
       const initialBalance = bankConfig?.initial_balance || 0;
@@ -127,6 +145,7 @@ const Dashboard = () => {
     });
   };
 
+  // Calcular saldos atuais dos bancos considerando apenas lançamentos após configuração
   const calculateMonthlyData = () => {
     const totalRevenue = financialItems
       .filter(item => item.type === 'entrada')
