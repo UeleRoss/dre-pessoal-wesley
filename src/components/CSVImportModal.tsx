@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { X, Upload, Download } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 interface CSVImportModalProps {
   isOpen: boolean;
@@ -19,12 +19,14 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile && selectedFile.type === 'text/csv') {
+    if (selectedFile && (selectedFile.type === 'text/csv' || 
+        selectedFile.name.endsWith('.xlsx') || 
+        selectedFile.name.endsWith('.xls'))) {
       setFile(selectedFile);
     } else {
       toast({
         title: "Arquivo inválido",
-        description: "Por favor, selecione um arquivo CSV válido.",
+        description: "Por favor, selecione um arquivo CSV ou XLSX válido.",
         variant: "destructive",
       });
     }
@@ -66,6 +68,51 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
         amount: values[5] || ''
       };
     }).filter(Boolean);
+  };
+
+  const parseXLSX = (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Pega a primeira planilha
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // Converte para JSON (array de arrays)
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          console.log('Dados da planilha:', jsonData);
+          
+          // Filtra linhas vazias e mapeia para o formato esperado
+          const records = jsonData
+            .filter((row: any) => row && row.length >= 6 && row[1]) // Verifica se tem dados suficientes
+            .map((row: any, index: number) => {
+              console.log(`Linha ${index + 1}:`, row);
+              
+              return {
+                date: row[0] ? row[0].toString() : '',
+                description: row[1] ? row[1].toString() : '',
+                type: row[2] ? row[2].toString() : '',
+                category: row[3] ? row[3].toString() : '',
+                bank: row[4] ? row[4].toString() : '',
+                amount: row[5] ? row[5].toString() : ''
+              };
+            });
+          
+          console.log('Registros processados da planilha:', records.length);
+          resolve(records);
+        } catch (error) {
+          console.error('Erro ao processar XLSX:', error);
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+      reader.readAsArrayBuffer(file);
+    });
   };
 
   const parseDate = (dateStr: string): string => {
@@ -174,8 +221,17 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      const text = await file.text();
-      const records = parseCSV(text);
+      let records;
+      
+      // Determina se é CSV ou XLSX e processa adequadamente
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        console.log('Processando arquivo XLSX...');
+        records = await parseXLSX(file);
+      } else {
+        console.log('Processando arquivo CSV...');
+        const text = await file.text();
+        records = parseCSV(text);
+      }
       
       console.log('Registros processados:', records.length);
       console.log('Primeiros 3 registros:', records.slice(0, 3));
@@ -222,7 +278,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             amount: amount,
             category: category,
             bank: bank,
-            source: 'CSV Import'
+            source: file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'XLSX Import' : 'CSV Import'
           };
 
           console.log(`Inserindo registro ${index + 1}:`, financialItem);
@@ -284,13 +340,28 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     window.URL.revokeObjectURL(url);
   };
 
+  const downloadXLSXTemplate = () => {
+    // Criar uma planilha de exemplo
+    const data = [
+      ['05/02/2025', 'Salário Mensal', 'entrada', 'Pro-Labore', 'CONTA SIMPLES', '5000,00'],
+      ['06/02/2025', 'Compras Supermercado', 'saida', 'Comida', 'BRADESCO', '150,75'],
+      ['07/02/2025', 'Transferência PIX', 'transferencia', 'Entre bancos', 'C6 BANK', '200,00']
+    ];
+    
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Lançamentos');
+    
+    XLSX.writeFile(workbook, 'template_importacao.xlsx');
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Importar CSV</CardTitle>
+          <CardTitle>Importar CSV/XLSX</CardTitle>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
@@ -298,26 +369,37 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              Importe seus registros financeiros usando um arquivo CSV sem cabeçalho. As colunas devem estar na ordem: Data, Descrição, Tipo, Categoria, Banco, Valor.
+              Importe seus registros financeiros usando um arquivo CSV ou XLSX. As colunas devem estar na ordem: Data, Descrição, Tipo, Categoria, Banco, Valor.
             </p>
             
-            <Button 
-              variant="outline" 
-              onClick={downloadTemplate}
-              className="w-full mb-4"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Baixar Template CSV
-            </Button>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <Button 
+                variant="outline" 
+                onClick={downloadTemplate}
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Template CSV
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={downloadXLSXTemplate}
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Template XLSX
+              </Button>
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">
-              Selecionar arquivo CSV
+              Selecionar arquivo CSV ou XLSX
             </label>
             <input
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               onChange={handleFileChange}
               className="w-full p-2 border rounded-lg"
             />
@@ -328,6 +410,9 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
               <p className="text-sm text-green-700">
                 Arquivo selecionado: {file.name}
               </p>
+              <p className="text-xs text-gray-600">
+                Tipo: {file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'Excel (XLSX)' : 'CSV'}
+              </p>
             </div>
           )}
 
@@ -337,7 +422,8 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             <p>• Valor deve ser maior que zero e menor que R$ 1.000.000</p>
             <p>• Data no formato DD/MM/AAAA ou AAAA-MM-DD</p>
             <p>• Tipos aceitos: entrada, saida, transferencia</p>
-            <p>• Separadores: vírgula (,), ponto e vírgula (;) ou tab</p>
+            <p>• Para CSV: separadores vírgula (,), ponto e vírgula (;) ou tab</p>
+            <p>• Para XLSX: dados da primeira planilha</p>
             <p className="mt-2 text-green-600">✓ Dados inválidos serão ignorados com relatório detalhado</p>
           </div>
 
