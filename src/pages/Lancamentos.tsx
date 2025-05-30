@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import Auth from "@/components/Auth";
 import NewEntryModal from "@/components/NewEntryModal";
@@ -49,12 +51,13 @@ const Lancamentos = () => {
   const [user, setUser] = useState<any>(null);
   const [items, setItems] = useState<FinancialItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterBank, setFilterBank] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterBank, setFilterBank] = useState("all");
   const [showNewEntryModal, setShowNewEntryModal] = useState(false);
   const [editingItem, setEditingItem] = useState<FinancialItem | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -138,6 +141,26 @@ const Lancamentos = () => {
     }
   });
 
+  const deleteMultipleMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data, error } = await supabase
+        .from('financial_items')
+        .delete()
+        .in('id', ids);
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+      setSelectedItems([]);
+      toast({
+        title: "Sucesso",
+        description: "Lançamentos deletados com sucesso!",
+      });
+    }
+  });
+
   const handleEdit = (item: FinancialItem) => {
     setEditingItem(item);
   };
@@ -146,12 +169,34 @@ const Lancamentos = () => {
     setEditingItem(null);
   };
 
+  const handleSelectItem = (itemId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedItems(prev => [...prev, itemId]);
+    } else {
+      setSelectedItems(prev => prev.filter(id => id !== itemId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(filteredItems.map(item => item.id));
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedItems.length > 0) {
+      deleteMultipleMutation.mutate(selectedItems);
+    }
+  };
+
   const filteredItems = financialItems.filter(item => {
     const searchTermLower = searchTerm.toLowerCase();
     const descriptionMatches = item.description.toLowerCase().includes(searchTermLower);
-    const categoryMatches = filterCategory ? item.category === filterCategory : true;
-    const typeMatches = filterType ? item.type === filterType : true;
-    const bankMatches = filterBank ? item.bank === filterBank : true;
+    const categoryMatches = filterCategory === "all" || item.category === filterCategory;
+    const typeMatches = filterType === "all" || item.type === filterType;
+    const bankMatches = filterBank === "all" || item.bank === filterBank;
 
     return descriptionMatches && categoryMatches && typeMatches && bankMatches;
   });
@@ -194,7 +239,7 @@ const Lancamentos = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           
-          <Select onValueChange={setFilterType}>
+          <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger>
               <SelectValue placeholder="Filtrar por tipo" />
             </SelectTrigger>
@@ -205,7 +250,7 @@ const Lancamentos = () => {
             </SelectContent>
           </Select>
           
-          <Select onValueChange={setFilterCategory}>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
             <SelectTrigger>
               <SelectValue placeholder="Filtrar por categoria" />
             </SelectTrigger>
@@ -217,7 +262,7 @@ const Lancamentos = () => {
             </SelectContent>
           </Select>
 
-          <Select onValueChange={setFilterBank}>
+          <Select value={filterBank} onValueChange={setFilterBank}>
             <SelectTrigger>
               <SelectValue placeholder="Filtrar por banco" />
             </SelectTrigger>
@@ -231,9 +276,9 @@ const Lancamentos = () => {
           
           <Button variant="outline" onClick={() => {
             setSearchTerm("");
-            setFilterType("");
-            setFilterCategory("");
-            setFilterBank("");
+            setFilterType("all");
+            setFilterCategory("all");
+            setFilterBank("all");
           }}>
             <Filter className="h-4 w-4 mr-2" />
             Limpar Filtros
@@ -244,14 +289,48 @@ const Lancamentos = () => {
       {/* Lista de Lançamentos */}
       <Card>
         <CardHeader>
-          <CardTitle>Lançamentos Financeiros</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Lançamentos Financeiros</CardTitle>
+            {selectedItems.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {selectedItems.length} selecionado{selectedItems.length > 1 ? 's' : ''}
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Deletar Selecionados
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir Lançamentos</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir {selectedItems.length} lançamento{selectedItems.length > 1 ? 's' : ''}? Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDeleteSelected}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {filteredItems.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p className="text-lg font-medium">Nenhum lançamento encontrado</p>
               <p className="text-sm">
-                {searchTerm || filterType || filterCategory || filterBank 
+                {searchTerm || filterType !== "all" || filterCategory !== "all" || filterBank !== "all"
                   ? "Tente ajustar os filtros para ver mais resultados"
                   : "Adicione seu primeiro lançamento financeiro"
                 }
@@ -259,25 +338,43 @@ const Lancamentos = () => {
             </div>
           ) : (
             <div className="space-y-3">
+              {/* Select All Header */}
+              <div className="flex items-center gap-3 p-4 border-b">
+                <Checkbox
+                  checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
+                  onCheckedChange={handleSelectAll}
+                />
+                <span className="text-sm font-medium">
+                  Selecionar todos ({filteredItems.length})
+                </span>
+              </div>
+
               {filteredItems.map((item) => (
                 <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <Badge variant={item.type === 'entrada' ? 'default' : 'destructive'}>
-                        {item.type === 'entrada' ? 'Entrada' : 'Saída'}
-                      </Badge>
-                      <span className="font-medium">{item.description}</span>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      checked={selectedItems.includes(item.id)}
+                      onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                    />
                     
-                    <div className="text-sm text-gray-600 flex gap-4">
-                      <span>📅 {formatBrazilDate(item.date)}</span>
-                      <span>🏷️ {item.category}</span>
-                      <span>🏦 {item.bank}</span>
-                      {item.source && <span>📁 {item.source}</span>}
-                    </div>
-                    
-                    <div className="text-xs text-gray-400 mt-1">
-                      Criado em: {formatBrazilDateTime(item.created_at)}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <Badge variant={item.type === 'entrada' ? 'default' : 'destructive'}>
+                          {item.type === 'entrada' ? 'Entrada' : 'Saída'}
+                        </Badge>
+                        <span className="font-medium">{item.description}</span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600 flex gap-4">
+                        <span>📅 {formatBrazilDate(item.date)}</span>
+                        <span>🏷️ {item.category}</span>
+                        <span>🏦 {item.bank}</span>
+                        {item.source && <span>📁 {item.source}</span>}
+                      </div>
+                      
+                      <div className="text-xs text-gray-400 mt-1">
+                        Criado em: {formatBrazilDateTime(item.created_at)}
+                      </div>
                     </div>
                   </div>
                   
