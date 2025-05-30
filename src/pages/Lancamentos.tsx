@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -50,6 +49,7 @@ const CATEGORIES = [
 const Lancamentos = () => {
   const [user, setUser] = useState<any>(null);
   const [items, setItems] = useState<FinancialItem[]>([]);
+  const [allItems, setAllItems] = useState<FinancialItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -74,7 +74,25 @@ const Lancamentos = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Buscar lançamentos financeiros
+  // Buscar todos os lançamentos (para seleção completa)
+  const { data: allFinancialItems = [] } = useQuery({
+    queryKey: ['all-financial-items'],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (error) throw error;
+      setAllItems(data || []);
+      return data;
+    },
+    enabled: !!user
+  });
+
+  // Buscar lançamentos financeiros do mês selecionado
   const { data: financialItems = [], refetch } = useQuery({
     queryKey: ['financial-items', selectedMonth.getMonth(), selectedMonth.getFullYear()],
     queryFn: async () => {
@@ -108,6 +126,7 @@ const Lancamentos = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+      queryClient.invalidateQueries({ queryKey: ['all-financial-items'] });
     }
   });
 
@@ -123,6 +142,7 @@ const Lancamentos = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+      queryClient.invalidateQueries({ queryKey: ['all-financial-items'] });
     }
   });
 
@@ -138,6 +158,7 @@ const Lancamentos = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+      queryClient.invalidateQueries({ queryKey: ['all-financial-items'] });
     }
   });
 
@@ -153,6 +174,7 @@ const Lancamentos = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial-items'] });
+      queryClient.invalidateQueries({ queryKey: ['all-financial-items'] });
       setSelectedItems([]);
       toast({
         title: "Sucesso",
@@ -180,6 +202,14 @@ const Lancamentos = () => {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedItems(filteredItems.map(item => item.id));
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleSelectAllComplete = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(allItems.map(item => item.id));
     } else {
       setSelectedItems([]);
     }
@@ -338,15 +368,27 @@ const Lancamentos = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Select All Header */}
-              <div className="flex items-center gap-3 p-4 border-b">
-                <Checkbox
-                  checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-                <span className="text-sm font-medium">
-                  Selecionar todos ({filteredItems.length})
-                </span>
+              {/* Select All Headers */}
+              <div className="flex flex-col gap-2 p-4 border-b bg-gray-50 rounded">
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <span className="text-sm font-medium">
+                    Selecionar todos do mês atual ({filteredItems.length})
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={selectedItems.length === allItems.length && allItems.length > 0}
+                    onCheckedChange={handleSelectAllComplete}
+                  />
+                  <span className="text-sm font-medium text-red-600">
+                    Selecionar TODOS os lançamentos da base ({allItems.length})
+                  </span>
+                </div>
               </div>
 
               {filteredItems.map((item) => (
