@@ -199,7 +199,7 @@ const Lancamentos = () => {
               <SelectValue placeholder="Filtrar por tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os tipos</SelectItem>
+              <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="entrada">Entrada</SelectItem>
               <SelectItem value="saida">Saída</SelectItem>
             </SelectContent>
@@ -210,7 +210,7 @@ const Lancamentos = () => {
               <SelectValue placeholder="Filtrar por categoria" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas as categorias</SelectItem>
+              <SelectItem value="all">Todas as categorias</SelectItem>
               {CATEGORIES.map(category => (
                 <SelectItem key={category} value={category}>{category}</SelectItem>
               ))}
@@ -222,7 +222,7 @@ const Lancamentos = () => {
               <SelectValue placeholder="Filtrar por banco" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os bancos</SelectItem>
+              <SelectItem value="all">Todos os bancos</SelectItem>
               {BANKS.map(bank => (
                 <SelectItem key={bank} value={bank}>{bank}</SelectItem>
               ))}
