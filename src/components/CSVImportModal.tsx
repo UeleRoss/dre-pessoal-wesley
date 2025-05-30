@@ -35,8 +35,10 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     // Conta quantas vírgulas e ponto e vírgulas existem na primeira linha
     const commaCount = (firstLine.match(/,/g) || []).length;
     const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
     
     // Usa o separador que aparece mais vezes
+    if (tabCount > commaCount && tabCount > semicolonCount) return '\t';
     return semicolonCount > commaCount ? ';' : ',';
   };
 
@@ -45,18 +47,21 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     console.log('Separador detectado:', separator);
     
     const lines = text.split('\n');
-    const headers = lines[0].split(separator).map(h => h.trim().toLowerCase());
     
-    console.log('Headers encontrados:', headers);
-    
-    return lines.slice(1).map(line => {
+    // Como não há cabeçalho, processamos todas as linhas
+    return lines.map(line => {
       if (line.trim() === '') return null;
       const values = line.split(separator).map(v => v.trim());
-      const row: any = {};
-      headers.forEach((header, index) => {
-        row[header] = values[index] || '';
-      });
-      return row;
+      
+      // Mapeia as colunas por posição: Data, Descrição, Tipo, Categoria, Banco, Valor
+      return {
+        date: values[0] || '',
+        description: values[1] || '',
+        type: values[2] || '',
+        category: values[3] || '',
+        bank: values[4] || '',
+        amount: values[5] || ''
+      };
     }).filter(Boolean);
   };
 
@@ -90,7 +95,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/,
       // DD-MM-YYYY ou DD-MM-YY
       /^(\d{1,2})-(\d{1,2})-(\d{2,4})$/,
-      // MM/DD/YYYY ou MM/DD/YY
+      // MM/DD/YYYY ou MM/DD/YY (formato americano)
       /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/
     ];
 
@@ -145,25 +150,23 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       
       for (const record of records) {
         try {
-          // Mapeamento flexível dos campos
-          const dateStr = record.date || record.data || record.d || '';
-          const validDate = parseDate(dateStr);
+          const validDate = parseDate(record.date);
           
-          let type = (record.type || record.tipo || record.t || 'entrada').toLowerCase().trim();
-          const description = record.description || record.descricao || record.desc || 'Sem descrição';
+          let type = (record.type || 'entrada').toLowerCase().trim();
+          const description = record.description || 'Importado do CSV';
           
           // Limpa o valor removendo "R$", espaços e convertendo vírgula para ponto
-          let amountStr = (record.amount || record.valor || record.v || '0').toString();
+          let amountStr = (record.amount || '0').toString();
           amountStr = amountStr.replace(/[R$\s]/g, '').replace(',', '.');
           const amount = parseFloat(amountStr);
           
-          const category = record.category || record.categoria || record.cat || 'Sem categoria';
-          const bank = record.bank || record.banco || record.b || 'CONTA SIMPLES';
+          const category = record.category || 'Importado';
+          const bank = record.bank || 'CONTA SIMPLES';
           
           // Normalizar o tipo para garantir que seja reconhecido corretamente
-          if (type === 'saída' || type === 'saida' || type === 'out' || type === 'expense') {
+          if (type === 'saída' || type === 'saida' || type === 'out' || type === 'expense' || type === 'débito' || type === 'debito') {
             type = 'saida';
-          } else if (type === 'entrada' || type === 'in' || type === 'income') {
+          } else if (type === 'entrada' || type === 'in' || type === 'income' || type === 'crédito' || type === 'credito') {
             type = 'entrada';
           } else if (type === 'transferência' || type === 'transferencia' || type === 'transfer') {
             type = 'transferencia';
@@ -184,10 +187,10 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             user_id: user.id,
             date: validDate,
             type: type,
-            description: description || 'Importado do CSV',
+            description: description,
             amount: Math.abs(amount), // Garante que seja positivo
-            category: category || 'Importado',
-            bank: bank || 'CONTA SIMPLES',
+            category: category,
+            bank: bank,
             source: 'CSV Import'
           };
 
@@ -238,7 +241,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   };
 
   const downloadTemplate = () => {
-    const template = "date;type;description;amount;category;bank\n2025-02-05;entrada;Salário;5000,00;Trabalho;CONTA SIMPLES\n2025-02-06;saida;Compras;150,75;Alimentação;BRADESCO\n2025-02-07;transferencia;PIX;200,00;Transferência;C6 BANK";
+    const template = "05/02/2025;Salário;entrada;Trabalho;CONTA SIMPLES;5000,00\n06/02/2025;Compras;saida;Alimentação;BRADESCO;150,75\n07/02/2025;PIX;transferencia;Transferência;C6 BANK;200,00";
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -262,7 +265,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              Importe seus registros financeiros usando um arquivo CSV. O sistema detecta automaticamente o separador (vírgula ou ponto e vírgula).
+              Importe seus registros financeiros usando um arquivo CSV sem cabeçalho. As colunas devem estar na ordem: Data, Descrição, Tipo, Categoria, Banco, Valor.
             </p>
             
             <Button 
@@ -296,12 +299,12 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
           )}
 
           <div className="text-xs text-gray-500">
-            <p><strong>Formatos aceitos:</strong></p>
-            <p>• Separadores: vírgula (,) ou ponto e vírgula (;)</p>
-            <p>• Valores: "R$ 100,50" ou "100.50"</p>
-            <p>• Datas: "2025-02-05", "05/02/2025" ou "05-02-2025"</p>
-            <p>• Campos: date, type, description, amount, category, bank</p>
-            <p>• Tipos: "entrada", "saida", "transferencia"</p>
+            <p><strong>Formato esperado (sem cabeçalho):</strong></p>
+            <p>• Ordem das colunas: Data, Descrição, Tipo, Categoria, Banco, Valor</p>
+            <p>• Separadores: vírgula (,), ponto e vírgula (;) ou tab</p>
+            <p>• Valores: "R$ 100,50" ou "100.50" ou "100,50"</p>
+            <p>• Datas: "05/02/2025", "05-02-2025" ou "2025-02-05"</p>
+            <p>• Tipos: "entrada", "saida", "crédito", "débito"</p>
             <p className="mt-2 text-green-600">✓ Dados incompletos serão preenchidos automaticamente</p>
           </div>
 
