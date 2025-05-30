@@ -347,6 +347,7 @@ const Lancamentos = () => {
         onClose={handleCloseEditModal}
         item={editingItem}
         onSuccess={refetch}
+        userId={user?.id || ''}
       />
     </div>
   );
