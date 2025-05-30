@@ -1,31 +1,14 @@
-
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
-// Categorias fixas
-const FIXED_CATEGORIES = [
-  "Carro",
-  "Comida", 
-  "Contas Mensais",
-  "Entre bancos",
-  "Escritório",
-  "Estudos",
-  "Go On Outdoor",
-  "Imposto",
-  "Investimentos",
-  "Lazer e ócio",
-  "Pro-Labore",
-  "Vida esportiva",
-  "Anúncios Online",
-  "Itens Físicos"
-];
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { getCurrentBrazilDate } from "@/utils/dateUtils";
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -33,72 +16,46 @@ interface NewEntryModalProps {
   onSuccess: () => void;
 }
 
+interface Category {
+  id: string;
+  name: string;
+}
+
+const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
+
 const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    type: '',
     amount: '',
     description: '',
-    type: 'entrada' as 'entrada' | 'saida',
     category: '',
     bank: '',
+    date: getCurrentBrazilDate(), // Usar data atual do Brasil
   });
 
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Buscar usuário atual
-  const { data: user } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      return data.user;
-    }
-  });
-
-  // Buscar bancos disponíveis (dinâmico)
-  const { data: availableBanks = [] } = useQuery({
-    queryKey: ['available-banks', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('financial_items')
-        .select('bank')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      
-      const dynamicBanks = [...new Set(data.map(item => item.bank))];
-      // Combinar bancos fixos com os dinâmicos
-      const fixedBanks = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
-      return [...fixedBanks, ...dynamicBanks.filter(bank => !fixedBanks.includes(bank))];
-    },
-    enabled: !!user?.id
-  });
-
-  // Buscar categorias personalizadas
-  const { data: customCategories = [] } = useQuery({
-    queryKey: ['custom-categories'],
+  // Buscar categorias do usuário
+  const { data: categories, isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['categories'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
-        .select('*')
-        .order('name');
+        .select('*');
       
       if (error) throw error;
       return data;
     }
   });
 
-  // Combinar categorias fixas com personalizadas
-  const allCategories = [
-    ...FIXED_CATEGORIES,
-    ...customCategories.map(cat => cat.name)
-  ].sort();
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const { data: session } = await supabase.auth.getSession();
+      const user = session?.session?.user;
 
-  const createEntryMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      if (!user) throw new Error('Usuário não autenticado');
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
 
       const { error } = await supabase
         .from('financial_items')
@@ -113,16 +70,10 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     onSuccess: () => {
       toast({
         title: "Lançamento criado",
-        description: "Novo lançamento adicionado com sucesso!",
+        description: "Lançamento adicionado com sucesso!",
       });
       onSuccess();
       onClose();
-      resetForm();
-      // Invalidar todas as queries relacionadas para atualização em tempo real
-      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly-analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['trend-analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['banks'] });
     },
     onError: () => {
       toast({
@@ -133,60 +84,38 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     }
   });
 
-  const resetForm = () => {
-    setFormData({
-      date: new Date().toISOString().split('T')[0],
-      amount: '',
-      description: '',
-      type: 'entrada',
-      category: '',
-      bank: '',
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.amount || !formData.description || !formData.category || !formData.bank) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
-    createEntryMutation.mutate(formData);
+    createMutation.mutate(formData);
   };
 
+  // Reset form quando o modal abrir
   useEffect(() => {
-    if (!isOpen) {
-      resetForm();
+    if (isOpen) {
+      setFormData({
+        type: '',
+        amount: '',
+        description: '',
+        category: '',
+        bank: '',
+        date: getCurrentBrazilDate(), // Sempre usar data atual do Brasil
+      });
     }
   }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo Lançamento</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="date">Data</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
             <Label htmlFor="type">Tipo</Label>
             <Select
               value={formData.type}
-              onValueChange={(value: 'entrada' | 'saida') => setFormData({ ...formData, type: value })}
+              onValueChange={(value) => setFormData({ ...formData, type: value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo" />
@@ -204,20 +133,20 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
               id="amount"
               type="number"
               step="0.01"
-              placeholder="0.00"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              placeholder="0.00"
               required
             />
           </div>
 
           <div>
             <Label htmlFor="description">Descrição</Label>
-            <Input
+            <Textarea
               id="description"
-              placeholder="Descrição do lançamento"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Ex: Salário, Conta de luz"
               required
             />
           </div>
@@ -227,14 +156,15 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
             <Select
               value={formData.category}
               onValueChange={(value) => setFormData({ ...formData, category: value })}
+              disabled={isLoadingCategories}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>
               <SelectContent>
-                {allCategories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                {categories?.map((category: Category) => (
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -251,7 +181,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectValue placeholder="Selecione o banco" />
               </SelectTrigger>
               <SelectContent>
-                {availableBanks.map((bank) => (
+                {BANKS.map((bank) => (
                   <SelectItem key={bank} value={bank}>
                     {bank}
                   </SelectItem>
@@ -260,18 +190,20 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
             </Select>
           </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={createEntryMutation.isPending}
-              className="flex-1"
-            >
-              {createEntryMutation.isPending ? 'Salvando...' : 'Salvar'}
-            </Button>
+          <div>
+            <Label htmlFor="date">Data</Label>
+            <Input
+              id="date"
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              required
+            />
           </div>
+
+          <Button type="submit">
+            Adicionar
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
