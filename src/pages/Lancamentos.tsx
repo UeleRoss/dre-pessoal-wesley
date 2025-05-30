@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -164,12 +165,23 @@ const Lancamentos = () => {
 
   const deleteMultipleMutation = useMutation({
     mutationFn: async (ids: string[]) => {
+      console.log("Tentando deletar IDs:", ids);
+      
+      if (ids.length === 0) {
+        throw new Error("Nenhum item selecionado para deletar");
+      }
+
       const { data, error } = await supabase
         .from('financial_items')
         .delete()
         .in('id', ids);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao deletar:", error);
+        throw error;
+      }
+      
+      console.log("Deletado com sucesso:", data);
       return data;
     },
     onSuccess: () => {
@@ -179,6 +191,14 @@ const Lancamentos = () => {
       toast({
         title: "Sucesso",
         description: "Lançamentos deletados com sucesso!",
+      });
+    },
+    onError: (error) => {
+      console.error("Erro na mutação:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao deletar lançamentos: " + error.message,
+        variant: "destructive",
       });
     }
   });
@@ -208,16 +228,26 @@ const Lancamentos = () => {
   };
 
   const handleSelectAllComplete = (checked: boolean) => {
+    console.log("Selecionando todos da base:", checked, "Total de itens:", allItems.length);
     if (checked) {
-      setSelectedItems(allItems.map(item => item.id));
+      const allIds = allItems.map(item => item.id);
+      console.log("IDs selecionados:", allIds);
+      setSelectedItems(allIds);
     } else {
       setSelectedItems([]);
     }
   };
 
   const handleDeleteSelected = () => {
+    console.log("Deletando itens selecionados:", selectedItems);
     if (selectedItems.length > 0) {
       deleteMultipleMutation.mutate(selectedItems);
+    } else {
+      toast({
+        title: "Aviso",
+        description: "Nenhum item selecionado para deletar",
+        variant: "destructive",
+      });
     }
   };
 
