@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import Auth from "@/components/Auth";
-import CategoryManager from "@/components/CategoryManager";
+import InvestmentCategoryManager from "@/components/InvestmentCategoryManager";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,11 +97,14 @@ const Investimentos = () => {
     queryKey: ['investment-categories'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('categories')
+        .from('investment_categories')
         .select('*')
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        // Se a tabela não existir ainda, usar apenas as categorias padrão
+        return DEFAULT_INVESTMENT_CATEGORIES.sort();
+      }
       
       // Combinar categorias padrão com personalizadas
       const customCategories = data.map(cat => cat.name);
@@ -431,7 +435,7 @@ const Investimentos = () => {
               <DialogHeader>
                 <DialogTitle>Gerenciar Categorias de Investimento</DialogTitle>
               </DialogHeader>
-              <CategoryManager />
+              <InvestmentCategoryManager />
             </DialogContent>
           </Dialog>
 
