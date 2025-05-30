@@ -6,7 +6,8 @@ import {
   Receipt, 
   BarChart3, 
   CreditCard,
-  TrendingUp
+  TrendingUp,
+  PiggyBank
 } from "lucide-react";
 
 const navigation = [
@@ -14,6 +15,7 @@ const navigation = [
   { name: "Lançamentos", href: "/lancamentos", icon: Receipt },
   { name: "Análise", href: "/analise", icon: BarChart3 },
   { name: "Contas", href: "/contas", icon: CreditCard },
+  { name: "Investimentos", href: "/investimentos", icon: PiggyBank },
 ];
 
 const Layout = () => {
