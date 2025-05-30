@@ -32,12 +32,10 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
 
   const detectSeparator = (text: string) => {
     const firstLine = text.split('\n')[0];
-    // Conta quantas vírgulas e ponto e vírgulas existem na primeira linha
     const commaCount = (firstLine.match(/,/g) || []).length;
     const semicolonCount = (firstLine.match(/;/g) || []).length;
     const tabCount = (firstLine.match(/\t/g) || []).length;
     
-    // Usa o separador que aparece mais vezes
     if (tabCount > commaCount && tabCount > semicolonCount) return '\t';
     return semicolonCount > commaCount ? ';' : ',';
   };
@@ -46,14 +44,19 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     const separator = detectSeparator(text);
     console.log('Separador detectado:', separator);
     
-    const lines = text.split('\n');
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    console.log('Total de linhas encontradas:', lines.length);
     
-    // Como não há cabeçalho, processamos todas as linhas
-    return lines.map(line => {
-      if (line.trim() === '') return null;
-      const values = line.split(separator).map(v => v.trim());
+    return lines.map((line, index) => {
+      const values = line.split(separator).map(v => v.trim().replace(/"/g, ''));
+      console.log(`Linha ${index + 1}:`, values);
       
-      // Mapeia as colunas por posição: Data, Descrição, Tipo, Categoria, Banco, Valor
+      // Validação: deve ter pelo menos 6 colunas
+      if (values.length < 6) {
+        console.log(`Linha ${index + 1} ignorada: menos de 6 colunas`);
+        return null;
+      }
+      
       return {
         date: values[0] || '',
         description: values[1] || '',
@@ -66,22 +69,19 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   };
 
   const parseDate = (dateStr: string): string => {
-    console.log('Parsing date:', dateStr);
+    console.log('Convertendo data:', dateStr);
     
-    // Se não há data, usa data atual
     if (!dateStr || dateStr.trim() === '') {
       const today = new Date().toISOString().split('T')[0];
       console.log('Data vazia, usando data atual:', today);
       return today;
     }
 
-    // Remove espaços e caracteres especiais
     const cleanDate = dateStr.trim();
     
-    // Verifica se já está no formato YYYY-MM-DD
+    // Se já está no formato YYYY-MM-DD
     const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (isoDateRegex.test(cleanDate)) {
-      // Valida se a data é válida
       const testDate = new Date(cleanDate);
       if (!isNaN(testDate.getTime())) {
         console.log('Data válida no formato ISO:', cleanDate);
@@ -89,39 +89,31 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       }
     }
 
-    // Tenta diferentes formatos de data
-    const formats = [
-      // DD/MM/YYYY ou DD/MM/YY
-      /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/,
-      // DD-MM-YYYY ou DD-MM-YY
-      /^(\d{1,2})-(\d{1,2})-(\d{2,4})$/,
-      // MM/DD/YYYY ou MM/DD/YY (formato americano)
-      /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/
-    ];
+    // Formato brasileiro DD/MM/YYYY ou DD/MM/YY
+    const brDateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
+    const brMatch = cleanDate.match(brDateRegex);
+    if (brMatch) {
+      let [, day, month, year] = brMatch;
+      
+      // Ajusta o ano se for de 2 dígitos
+      if (year.length === 2) {
+        const yearNum = parseInt(year);
+        year = yearNum > 50 ? `19${year}` : `20${year}`;
+      }
 
-    for (const format of formats) {
-      const match = cleanDate.match(format);
-      if (match) {
-        let [, part1, part2, year] = match;
-        
-        // Ajusta o ano se for de 2 dígitos
-        if (year.length === 2) {
-          const yearNum = parseInt(year);
-          year = yearNum > 50 ? `19${year}` : `20${year}`;
-        }
-
-        // Assume formato DD/MM/YYYY para datas brasileiras
-        const day = part1.padStart(2, '0');
-        const month = part2.padStart(2, '0');
-        
-        const formattedDate = `${year}-${month}-${day}`;
-        
-        // Valida a data
-        const testDate = new Date(formattedDate);
-        if (!isNaN(testDate.getTime())) {
-          console.log('Data convertida de', cleanDate, 'para', formattedDate);
-          return formattedDate;
-        }
+      const dayPadded = day.padStart(2, '0');
+      const monthPadded = month.padStart(2, '0');
+      
+      const formattedDate = `${year}-${monthPadded}-${dayPadded}`;
+      
+      // Valida a data
+      const testDate = new Date(formattedDate);
+      if (!isNaN(testDate.getTime()) && 
+          testDate.getFullYear() == parseInt(year) &&
+          testDate.getMonth() + 1 == parseInt(month) &&
+          testDate.getDate() == parseInt(day)) {
+        console.log('Data convertida de', cleanDate, 'para', formattedDate);
+        return formattedDate;
       }
     }
 
@@ -129,6 +121,49 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
     const fallbackDate = new Date().toISOString().split('T')[0];
     console.log('Não foi possível converter a data', cleanDate, ', usando data atual:', fallbackDate);
     return fallbackDate;
+  };
+
+  const normalizeType = (type: string): string => {
+    if (!type) return 'entrada';
+    
+    const normalized = type.toLowerCase().trim();
+    
+    if (['saída', 'saida', 'out', 'expense', 'débito', 'debito', 'despesa', 'gasto'].includes(normalized)) {
+      return 'saida';
+    } else if (['entrada', 'in', 'income', 'crédito', 'credito', 'receita'].includes(normalized)) {
+      return 'entrada';
+    } else if (['transferência', 'transferencia', 'transfer'].includes(normalized)) {
+      return 'transferencia';
+    }
+    
+    // Por padrão, assume entrada
+    return 'entrada';
+  };
+
+  const parseAmount = (amountStr: string): number => {
+    if (!amountStr) return 0;
+    
+    // Remove tudo que não é número, ponto ou vírgula
+    let cleanAmount = amountStr.toString().replace(/[^\d,.+-]/g, '');
+    
+    // Se tem vírgula e ponto, assume que vírgula é decimal (formato brasileiro)
+    if (cleanAmount.includes(',') && cleanAmount.includes('.')) {
+      // Remove pontos (milhares) e troca vírgula por ponto (decimal)
+      cleanAmount = cleanAmount.replace(/\./g, '').replace(',', '.');
+    } else if (cleanAmount.includes(',')) {
+      // Se só tem vírgula, verifica se é decimal ou milhares
+      const parts = cleanAmount.split(',');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        // Provavelmente é decimal
+        cleanAmount = cleanAmount.replace(',', '.');
+      } else {
+        // Provavelmente é separador de milhares
+        cleanAmount = cleanAmount.replace(/,/g, '');
+      }
+    }
+    
+    const parsed = parseFloat(cleanAmount);
+    return isNaN(parsed) ? 0 : Math.abs(parsed);
   };
 
   const handleImport = async () => {
@@ -143,56 +178,54 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       const records = parseCSV(text);
       
       console.log('Registros processados:', records.length);
-      console.log('Primeiro registro:', records[0]);
+      console.log('Primeiros 3 registros:', records.slice(0, 3));
       
       let successCount = 0;
       let errorCount = 0;
+      let skippedCount = 0;
       
-      for (const record of records) {
+      for (const [index, record] of records.entries()) {
         try {
-          const validDate = parseDate(record.date);
+          const amount = parseAmount(record.amount);
+          const description = record.description?.trim();
           
-          let type = (record.type || 'entrada').toLowerCase().trim();
-          const description = record.description || 'Importado do CSV';
-          
-          // Limpa o valor removendo "R$", espaços e convertendo vírgula para ponto
-          let amountStr = (record.amount || '0').toString();
-          amountStr = amountStr.replace(/[R$\s]/g, '').replace(',', '.');
-          const amount = parseFloat(amountStr);
-          
-          const category = record.category || 'Importado';
-          const bank = record.bank || 'CONTA SIMPLES';
-          
-          // Normalizar o tipo para garantir que seja reconhecido corretamente
-          if (type === 'saída' || type === 'saida' || type === 'out' || type === 'expense' || type === 'débito' || type === 'debito') {
-            type = 'saida';
-          } else if (type === 'entrada' || type === 'in' || type === 'income' || type === 'crédito' || type === 'credito') {
-            type = 'entrada';
-          } else if (type === 'transferência' || type === 'transferencia' || type === 'transfer') {
-            type = 'transferencia';
-          } else {
-            // Se não reconhecer o tipo, manter como entrada por padrão
-            type = 'entrada';
-          }
-          
-          console.log('Processando registro:', { date: validDate, type, description, amount, category, bank });
-          
-          // Validação básica
-          if (amount === 0 || isNaN(amount)) {
-            console.log('Ignorando linha com valor inválido:', record);
+          // Validações básicas
+          if (!description || description === '') {
+            console.log(`Linha ${index + 1} ignorada: sem descrição`);
+            skippedCount++;
             continue;
           }
-
+          
+          if (amount === 0) {
+            console.log(`Linha ${index + 1} ignorada: valor zero ou inválido`);
+            skippedCount++;
+            continue;
+          }
+          
+          // Validação de valor absurdo (maior que 1 milhão)
+          if (amount > 1000000) {
+            console.log(`Linha ${index + 1} ignorada: valor muito alto (${amount})`);
+            skippedCount++;
+            continue;
+          }
+          
+          const validDate = parseDate(record.date);
+          const normalizedType = normalizeType(record.type);
+          const category = record.category?.trim() || 'Importado';
+          const bank = record.bank?.trim() || 'CONTA SIMPLES';
+          
           const financialItem = {
             user_id: user.id,
             date: validDate,
-            type: type,
+            type: normalizedType,
             description: description,
-            amount: Math.abs(amount), // Garante que seja positivo
+            amount: amount,
             category: category,
             bank: bank,
             source: 'CSV Import'
           };
+
+          console.log(`Inserindo registro ${index + 1}:`, financialItem);
 
           const { error } = await supabase
             .from('financial_items')
@@ -205,7 +238,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
             successCount++;
           }
         } catch (itemError) {
-          console.error('Erro ao processar item:', itemError, record);
+          console.error(`Erro ao processar item ${index + 1}:`, itemError, record);
           errorCount++;
         }
       }
@@ -213,12 +246,12 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
       if (successCount > 0) {
         toast({
           title: "Importação concluída!",
-          description: `${successCount} registros importados com sucesso.${errorCount > 0 ? ` ${errorCount} registros ignorados devido a erros.` : ''}`,
+          description: `${successCount} registros importados com sucesso.${skippedCount > 0 ? ` ${skippedCount} registros ignorados (sem descrição ou valor inválido).` : ''}${errorCount > 0 ? ` ${errorCount} registros com erro.` : ''}`,
         });
       } else {
         toast({
           title: "Nenhum registro importado",
-          description: "Verifique se o arquivo CSV está no formato correto.",
+          description: `${skippedCount} registros ignorados por não atenderem aos critérios (descrição obrigatória, valor válido).`,
           variant: "destructive",
         });
       }
@@ -241,7 +274,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   };
 
   const downloadTemplate = () => {
-    const template = "05/02/2025;Salário;entrada;Trabalho;CONTA SIMPLES;5000,00\n06/02/2025;Compras;saida;Alimentação;BRADESCO;150,75\n07/02/2025;PIX;transferencia;Transferência;C6 BANK;200,00";
+    const template = "05/02/2025;Salário Mensal;entrada;Pro-Labore;CONTA SIMPLES;5000,00\n06/02/2025;Compras Supermercado;saida;Comida;BRADESCO;150,75\n07/02/2025;Transferência PIX;transferencia;Entre bancos;C6 BANK;200,00";
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -299,13 +332,13 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
           )}
 
           <div className="text-xs text-gray-500">
-            <p><strong>Formato esperado (sem cabeçalho):</strong></p>
-            <p>• Ordem das colunas: Data, Descrição, Tipo, Categoria, Banco, Valor</p>
+            <p><strong>Validações aplicadas:</strong></p>
+            <p>• Descrição obrigatória (linhas sem descrição são ignoradas)</p>
+            <p>• Valor deve ser maior que zero e menor que R$ 1.000.000</p>
+            <p>• Data no formato DD/MM/AAAA ou AAAA-MM-DD</p>
+            <p>• Tipos aceitos: entrada, saida, transferencia</p>
             <p>• Separadores: vírgula (,), ponto e vírgula (;) ou tab</p>
-            <p>• Valores: "R$ 100,50" ou "100.50" ou "100,50"</p>
-            <p>• Datas: "05/02/2025", "05-02-2025" ou "2025-02-05"</p>
-            <p>• Tipos: "entrada", "saida", "crédito", "débito"</p>
-            <p className="mt-2 text-green-600">✓ Dados incompletos serão preenchidos automaticamente</p>
+            <p className="mt-2 text-green-600">✓ Dados inválidos serão ignorados com relatório detalhado</p>
           </div>
 
           <Button 
