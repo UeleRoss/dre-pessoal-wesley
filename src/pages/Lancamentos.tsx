@@ -147,39 +147,59 @@ const Lancamentos = () => {
 
   const deleteMultipleMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      console.log("Tentando deletar IDs:", ids);
+      console.log("Tentando deletar IDs:", ids.length, "itens");
       
       if (ids.length === 0) {
         throw new Error("Nenhum item selecionado para deletar");
       }
 
-      const { data, error } = await supabase
-        .from('financial_items')
-        .delete()
-        .in('id', ids);
+      // Processar em lotes de 50 itens para evitar URLs muito longas
+      const batchSize = 50;
+      const batches = [];
       
-      if (error) {
-        console.error("Erro ao deletar:", error);
-        throw error;
+      for (let i = 0; i < ids.length; i += batchSize) {
+        batches.push(ids.slice(i, i + batchSize));
+      }
+
+      console.log(`Processando ${batches.length} lotes de até ${batchSize} itens cada`);
+
+      let totalDeleted = 0;
+      
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        console.log(`Deletando lote ${i + 1}/${batches.length} com ${batch.length} itens`);
+        
+        const { error, count } = await supabase
+          .from('financial_items')
+          .delete()
+          .in('id', batch);
+        
+        if (error) {
+          console.error(`Erro no lote ${i + 1}:`, error);
+          throw error;
+        }
+        
+        totalDeleted += count || 0;
+        console.log(`Lote ${i + 1} deletado com sucesso. Total deletado até agora: ${totalDeleted}`);
       }
       
-      console.log("Deletado com sucesso:", data);
-      return data;
+      console.log(`Todos os lotes processados. Total final deletado: ${totalDeleted}`);
+      return { totalDeleted };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['financial-items'] });
       queryClient.invalidateQueries({ queryKey: ['all-financial-items'] });
       setSelectedItems([]);
       toast({
         title: "Sucesso",
-        description: "Lançamentos deletados com sucesso!",
+        description: `${data.totalDeleted} lançamentos deletados com sucesso!`,
       });
     },
-    onError: (error) => {
-      console.error("Erro na mutação:", error);
+    onError: (error: any) => {
+      console.error("Erro na mutação de deletar múltiplos:", error);
       toast({
         title: "Erro",
-        description: "Erro ao deletar lançamentos: " + error.message,
+        description: "Erro ao deletar lançamentos: " + (error.message || "Erro desconhecido"),
         variant: "destructive",
       });
     }
@@ -221,7 +241,7 @@ const Lancamentos = () => {
   };
 
   const handleDeleteSelected = () => {
-    console.log("Deletando itens selecionados:", selectedItems);
+    console.log("Deletando itens selecionados:", selectedItems.length, "itens");
     if (selectedItems.length > 0) {
       deleteMultipleMutation.mutate(selectedItems);
     } else {
