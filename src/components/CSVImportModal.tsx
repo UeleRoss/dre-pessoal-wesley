@@ -190,27 +190,70 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }: CSVImportModalProps) => 
   const parseAmount = (amountStr: string): number => {
     if (!amountStr) return 0;
     
-    // Remove tudo que não é número, ponto ou vírgula
-    let cleanAmount = amountStr.toString().replace(/[^\d,.+-]/g, '');
+    // Remove currency symbols (R$, $, etc.) and extra spaces
+    let cleanAmount = amountStr.toString()
+      .replace(/R\$\s*/g, '') // Remove R$ and spaces after it
+      .replace(/\$\s*/g, '')  // Remove $ and spaces after it
+      .replace(/\s+/g, '')    // Remove all spaces
+      .trim();
     
-    // Se tem vírgula e ponto, assume que vírgula é decimal (formato brasileiro)
-    if (cleanAmount.includes(',') && cleanAmount.includes('.')) {
-      // Remove pontos (milhares) e troca vírgula por ponto (decimal)
-      cleanAmount = cleanAmount.replace(/\./g, '').replace(',', '.');
-    } else if (cleanAmount.includes(',')) {
-      // Se só tem vírgula, verifica se é decimal ou milhares
+    console.log('Parsing amount:', amountStr, '-> cleaned:', cleanAmount);
+    
+    // Handle Brazilian format: 1.391,76 (dot as thousands separator, comma as decimal)
+    if (cleanAmount.includes('.') && cleanAmount.includes(',')) {
+      // Check if it's Brazilian format (more digits before comma than after)
       const parts = cleanAmount.split(',');
       if (parts.length === 2 && parts[1].length <= 2) {
-        // Provavelmente é decimal
+        // This is likely Brazilian format: remove dots (thousands) and replace comma with dot (decimal)
+        cleanAmount = cleanAmount.replace(/\./g, '').replace(',', '.');
+        console.log('Brazilian format detected:', cleanAmount);
+      }
+    } 
+    // Handle cases with only comma (could be decimal or thousands separator)
+    else if (cleanAmount.includes(',') && !cleanAmount.includes('.')) {
+      const parts = cleanAmount.split(',');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        // Probably decimal separator
         cleanAmount = cleanAmount.replace(',', '.');
+        console.log('Comma as decimal detected:', cleanAmount);
       } else {
-        // Provavelmente é separador de milhares
+        // Probably thousands separator
         cleanAmount = cleanAmount.replace(/,/g, '');
+        console.log('Comma as thousands detected:', cleanAmount);
+      }
+    }
+    // Handle cases with only dots
+    else if (cleanAmount.includes('.') && !cleanAmount.includes(',')) {
+      const parts = cleanAmount.split('.');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        // Probably decimal separator - keep as is
+        console.log('Dot as decimal detected:', cleanAmount);
+      } else if (parts.length > 2) {
+        // Multiple dots - probably thousands separators except the last one
+        const lastDotIndex = cleanAmount.lastIndexOf('.');
+        const beforeLastDot = cleanAmount.substring(0, lastDotIndex);
+        const afterLastDot = cleanAmount.substring(lastDotIndex + 1);
+        
+        if (afterLastDot.length <= 2) {
+          // Last dot is decimal, others are thousands
+          cleanAmount = beforeLastDot.replace(/\./g, '') + '.' + afterLastDot;
+          console.log('Multiple dots with decimal detected:', cleanAmount);
+        } else {
+          // All dots are thousands separators
+          cleanAmount = cleanAmount.replace(/\./g, '');
+          console.log('All dots as thousands detected:', cleanAmount);
+        }
       }
     }
     
+    // Remove any remaining non-numeric characters except dot
+    cleanAmount = cleanAmount.replace(/[^\d.-]/g, '');
+    
     const parsed = parseFloat(cleanAmount);
-    return isNaN(parsed) ? 0 : Math.abs(parsed);
+    const result = isNaN(parsed) ? 0 : Math.abs(parsed);
+    
+    console.log('Final parsed amount:', result);
+    return result;
   };
 
   const handleImport = async () => {
