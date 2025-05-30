@@ -1,16 +1,17 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, TrendingUp, TrendingDown, PiggyBank } from "lucide-react";
+import { Plus, Edit, Trash2, TrendingUp, TrendingDown, PiggyBank, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import Auth from "@/components/Auth";
+import CategoryManager from "@/components/CategoryManager";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +26,7 @@ import {
 
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
-const INVESTMENT_CATEGORIES = [
+const DEFAULT_INVESTMENT_CATEGORIES = [
   'Reserva de Emergência',
   'Reserva Carro',
   'Reserva em Dólar',
@@ -62,11 +63,14 @@ const Investimentos = () => {
   const [user, setUser] = useState<any>(null);
   const [showNewInvestmentModal, setShowNewInvestmentModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
   const [investmentForm, setInvestmentForm] = useState({
     name: '',
     category: '',
-    initial_amount: ''
+    initial_amount: '',
+    is_setup: false,
+    source_bank: ''
   });
   const [transactionForm, setTransactionForm] = useState({
     type: 'aporte' as 'aporte' | 'retirada',
@@ -90,6 +94,32 @@ const Investimentos = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Buscar categorias de investimento (padrão + personalizadas)
+  const { data: investmentCategories = [] } = useQuery({
+    queryKey: ['investment-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      
+      // Combinar categorias padrão com personalizadas
+      const customCategories = data.map(cat => cat.name);
+      const allCategories = [...DEFAULT_INVESTMENT_CATEGORIES];
+      
+      // Adicionar categorias personalizadas que não estão nas padrão
+      customCategories.forEach(cat => {
+        if (!allCategories.includes(cat)) {
+          allCategories.push(cat);
+        }
+      });
+      
+      return allCategories.sort();
+    }
+  });
 
   // Buscar investimentos
   const { data: investments = [] } = useQuery({
@@ -131,25 +161,48 @@ const Investimentos = () => {
     mutationFn: async (data: typeof investmentForm) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
-      const { error } = await supabase
+      // Criar investimento
+      const { error: investmentError } = await supabase
         .from('investments')
         .insert([{
-          ...data,
+          name: data.name,
+          category: data.category,
           initial_amount: parseFloat(data.initial_amount),
           current_balance: parseFloat(data.initial_amount),
           user_id: user.id
         }]);
       
-      if (error) throw error;
+      if (investmentError) throw investmentError;
+
+      // Se não for setup inicial e tiver banco de origem, criar lançamento de saída
+      if (!data.is_setup && data.source_bank) {
+        const { error: entryError } = await supabase
+          .from('financial_items')
+          .insert([{
+            description: `Investimento: ${data.name}`,
+            amount: parseFloat(data.initial_amount),
+            type: 'saida',
+            category: 'Investimentos',
+            bank: data.source_bank,
+            date: new Date().toISOString().split('T')[0],
+            user_id: user.id,
+            source: 'investimento'
+          }]);
+
+        if (entryError) throw entryError;
+      }
     },
     onSuccess: () => {
       toast({
         title: "Investimento criado",
-        description: "Novo investimento adicionado com sucesso!",
+        description: investmentForm.is_setup 
+          ? "Investimento de setup criado com sucesso!" 
+          : "Novo investimento adicionado e valor debitado!",
       });
       setShowNewInvestmentModal(false);
       resetInvestmentForm();
       queryClient.invalidateQueries({ queryKey: ['investments'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-items'] });
     },
     onError: () => {
       toast({
@@ -198,6 +251,24 @@ const Investimentos = () => {
             description: `Retirada de investimento: ${investment.name}`,
             amount: parseFloat(data.amount),
             type: 'entrada',
+            category: 'Investimentos',
+            bank: data.bank,
+            date: data.date,
+            user_id: user.id,
+            source: 'investimento'
+          }]);
+
+        if (entryError) throw entryError;
+      }
+
+      // Se for aporte, criar lançamento de saída no banco selecionado
+      if (data.type === 'aporte' && data.bank) {
+        const { error: entryError } = await supabase
+          .from('financial_items')
+          .insert([{
+            description: `Aporte em investimento: ${investment.name}`,
+            amount: parseFloat(data.amount),
+            type: 'saida',
             category: 'Investimentos',
             bank: data.bank,
             date: data.date,
@@ -267,7 +338,9 @@ const Investimentos = () => {
     setInvestmentForm({
       name: '',
       category: '',
-      initial_amount: ''
+      initial_amount: '',
+      is_setup: false,
+      source_bank: ''
     });
   };
 
@@ -294,25 +367,25 @@ const Investimentos = () => {
       return;
     }
 
+    if (!investmentForm.is_setup && !investmentForm.source_bank) {
+      toast({
+        title: "Banco obrigatório",
+        description: "Selecione o banco de origem para investimentos que não são de setup.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createInvestmentMutation.mutate(investmentForm);
   };
 
   const handleTransactionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedInvestment || !transactionForm.amount) {
+    if (!selectedInvestment || !transactionForm.amount || !transactionForm.bank) {
       toast({
         title: "Campos obrigatórios",
         description: "Preencha todos os campos obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (transactionForm.type === 'retirada' && !transactionForm.bank) {
-      toast({
-        title: "Banco obrigatório",
-        description: "Selecione o banco que receberá a retirada.",
         variant: "destructive",
       });
       return;
@@ -350,73 +423,122 @@ const Investimentos = () => {
           <p className="text-navy-600 mt-1">Gerencie seus investimentos e aportes</p>
         </div>
         
-        <Dialog open={showNewInvestmentModal} onOpenChange={setShowNewInvestmentModal}>
-          <DialogTrigger asChild>
-            <Button onClick={resetInvestmentForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Investimento
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo Investimento</DialogTitle>
-            </DialogHeader>
-            
-            <form onSubmit={handleInvestmentSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Nome do Investimento</Label>
-                <Input
-                  id="name"
-                  value={investmentForm.name}
-                  onChange={(e) => setInvestmentForm({ ...investmentForm, name: e.target.value })}
-                  placeholder="Ex: Nubank Reserva de Emergência"
-                  required
-                />
-              </div>
+        <div className="flex gap-2">
+          <Dialog open={showCategoryManager} onOpenChange={setShowCategoryManager}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Categorias
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Gerenciar Categorias de Investimento</DialogTitle>
+              </DialogHeader>
+              <CategoryManager />
+            </DialogContent>
+          </Dialog>
 
-              <div>
-                <Label htmlFor="category">Categoria</Label>
-                <Select
-                  value={investmentForm.category}
-                  onValueChange={(value) => setInvestmentForm({ ...investmentForm, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INVESTMENT_CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <Dialog open={showNewInvestmentModal} onOpenChange={setShowNewInvestmentModal}>
+            <DialogTrigger asChild>
+              <Button onClick={resetInvestmentForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Investimento
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Investimento</DialogTitle>
+              </DialogHeader>
+              
+              <form onSubmit={handleInvestmentSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Nome do Investimento</Label>
+                  <Input
+                    id="name"
+                    value={investmentForm.name}
+                    onChange={(e) => setInvestmentForm({ ...investmentForm, name: e.target.value })}
+                    placeholder="Ex: Nubank Reserva de Emergência"
+                    required
+                  />
+                </div>
 
-              <div>
-                <Label htmlFor="initial_amount">Valor Inicial</Label>
-                <Input
-                  id="initial_amount"
-                  type="number"
-                  step="0.01"
-                  value={investmentForm.initial_amount}
-                  onChange={(e) => setInvestmentForm({ ...investmentForm, initial_amount: e.target.value })}
-                  placeholder="15000.00"
-                  required
-                />
-              </div>
+                <div>
+                  <Label htmlFor="category">Categoria</Label>
+                  <Select
+                    value={investmentForm.category}
+                    onValueChange={(value) => setInvestmentForm({ ...investmentForm, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {investmentCategories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="flex gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setShowNewInvestmentModal(false)} className="flex-1">
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1">
-                  Criar Investimento
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div>
+                  <Label htmlFor="initial_amount">Valor Inicial</Label>
+                  <Input
+                    id="initial_amount"
+                    type="number"
+                    step="0.01"
+                    value={investmentForm.initial_amount}
+                    onChange={(e) => setInvestmentForm({ ...investmentForm, initial_amount: e.target.value })}
+                    placeholder="15000.00"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_setup"
+                    checked={investmentForm.is_setup}
+                    onCheckedChange={(checked) => setInvestmentForm({ ...investmentForm, is_setup: checked as boolean })}
+                  />
+                  <Label htmlFor="is_setup" className="text-sm">
+                    Setup inicial (não descontar do caixa)
+                  </Label>
+                </div>
+
+                {!investmentForm.is_setup && (
+                  <div>
+                    <Label htmlFor="source_bank">Banco de Origem</Label>
+                    <Select
+                      value={investmentForm.source_bank}
+                      onValueChange={(value) => setInvestmentForm({ ...investmentForm, source_bank: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o banco" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BANKS.map((bank) => (
+                          <SelectItem key={bank} value={bank}>
+                            {bank}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setShowNewInvestmentModal(false)} className="flex-1">
+                    Cancelar
+                  </Button>
+                  <Button type="submit" className="flex-1">
+                    Criar Investimento
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Cards de Resumo */}
@@ -593,26 +715,26 @@ const Investimentos = () => {
               />
             </div>
 
-            {transactionForm.type === 'retirada' && (
-              <div>
-                <Label htmlFor="bank">Banco (destino da retirada)</Label>
-                <Select
-                  value={transactionForm.bank}
-                  onValueChange={(value) => setTransactionForm({ ...transactionForm, bank: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o banco" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BANKS.map((bank) => (
-                      <SelectItem key={bank} value={bank}>
-                        {bank}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div>
+              <Label htmlFor="bank">
+                {transactionForm.type === 'aporte' ? 'Banco (origem do aporte)' : 'Banco (destino da retirada)'}
+              </Label>
+              <Select
+                value={transactionForm.bank}
+                onValueChange={(value) => setTransactionForm({ ...transactionForm, bank: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BANKS.map((bank) => (
+                    <SelectItem key={bank} value={bank}>
+                      {bank}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div>
               <Label htmlFor="description">Descrição (opcional)</Label>
