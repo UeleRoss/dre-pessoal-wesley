@@ -27,16 +27,12 @@ import {
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
 const DEFAULT_INVESTMENT_CATEGORIES = [
-  'Reserva de Emergência',
+  'Renda Fixa c6 bank',
+  'Fundos imobiliários',
+  'Fundo Go On Outdoor',
   'Reserva Carro',
-  'Reserva em Dólar',
-  'Ações Clear',
-  'Fundos Imobiliários',
-  'CDB/LCI/LCA',
-  'Tesouro Direto',
-  'Criptomoedas',
-  'Previdência',
-  'Outros'
+  'Reserva Casa Nova',
+  'Reserva de Emergência'
 ];
 
 interface Investment {
