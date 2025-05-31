@@ -1,35 +1,76 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, FileText, ClipboardPaste } from "lucide-react";
 import MonthSelector from "./MonthSelector";
+import CSVImportModal from "./CSVImportModal";
+import RawPasteModal from "./RawPasteModal";
 
 interface LancamentosHeaderProps {
   onNewEntry: () => void;
   selectedMonth: Date;
-  onMonthChange: (month: Date) => void;
+  onMonthChange: (date: Date) => void;
 }
 
 const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: LancamentosHeaderProps) => {
-  return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h1 className="text-3xl font-bold text-navy-800">Lançamentos Financeiros</h1>
-        <p className="text-navy-600 mt-1">
-          Gerencie suas receitas e despesas de forma eficiente
-        </p>
-      </div>
+  const [showCSVModal, setShowCSVModal] = useState(false);
+  const [showRawPasteModal, setShowRawPasteModal] = useState(false);
 
-      <div className="flex flex-col md:flex-row items-center gap-4">
-        <Button onClick={onNewEntry}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Lançamento
-        </Button>
-        
+  const handleImportSuccess = () => {
+    // Força atualização da página
+    window.location.reload();
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Lançamentos Financeiros</h1>
+        <p className="text-gray-600 mt-1">Gerencie suas entradas e saídas</p>
+      </div>
+      
+      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
         <MonthSelector 
           selectedMonth={selectedMonth}
           onMonthChange={onMonthChange}
         />
+        
+        <div className="flex gap-2">
+          <Button onClick={onNewEntry} className="flex-1 sm:flex-none">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Lançamento
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setShowCSVModal(true)}
+            className="flex-1 sm:flex-none"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Importar CSV/XLSX
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setShowRawPasteModal(true)}
+            className="flex-1 sm:flex-none"
+          >
+            <ClipboardPaste className="h-4 w-4 mr-2" />
+            Raw Paste
+          </Button>
+        </div>
       </div>
+
+      <CSVImportModal
+        isOpen={showCSVModal}
+        onClose={() => setShowCSVModal(false)}
+        onSuccess={handleImportSuccess}
+      />
+
+      <RawPasteModal
+        isOpen={showRawPasteModal}
+        onClose={() => setShowRawPasteModal(false)}
+        onSuccess={handleImportSuccess}
+      />
     </div>
   );
 };
