@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -106,31 +107,25 @@ const Analise = () => {
     staleTime: 0
   });
 
-  // Dados dos últimos 6 meses para tendência - incluindo resumos
+  // Dados históricos completos para tendência - desde o primeiro registro
   const { data: trendData = [], refetch: refetchTrend } = useQuery({
     queryKey: ['trend-analysis', user?.id],
     queryFn: async () => {
       if (!user) return [];
       
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-      sixMonthsAgo.setDate(1);
-      
-      // Buscar lançamentos detalhados
+      // Buscar TODOS os lançamentos detalhados do usuário
       const { data: items, error } = await supabase
         .from('financial_items')
         .select('*')
-        .gte('date', sixMonthsAgo.toISOString().split('T')[0])
         .eq('user_id', user.id)
         .order('date', { ascending: true });
       
       if (error) throw error;
       
-      // Buscar resumos mensais dos últimos 6 meses
+      // Buscar TODOS os resumos mensais do usuário
       const { data: summaries, error: summariesError } = await supabase
         .from('financial_summary')
         .select('*')
-        .gte('month', sixMonthsAgo.toISOString().split('T')[0])
         .eq('user_id', user.id)
         .order('month', { ascending: true });
       
@@ -140,7 +135,7 @@ const Analise = () => {
       const summaryItems = summaries?.map(summaryToItem) || [];
       const combined = [...(items || []), ...summaryItems];
       
-      console.log(`Dados de tendência: ${items?.length || 0} lançamentos + ${summaries?.length || 0} resumos = ${combined.length} total`);
+      console.log(`Dados históricos completos: ${items?.length || 0} lançamentos + ${summaries?.length || 0} resumos = ${combined.length} total`);
       
       return combined;
     },
@@ -222,28 +217,51 @@ const Analise = () => {
       .sort((a, b) => b.value - a.value);
   };
 
-  // Processamento dados de tendência (últimos 6 meses)
+  // Processamento dados de tendência - todos os meses históricos
   const processTrendData = () => {
-    const monthlyTotals = trendData.reduce((acc, item) => {
+    if (trendData.length === 0) return [];
+
+    // Encontrar o primeiro e último mês com dados
+    const firstDate = new Date(Math.min(...trendData.map(item => new Date(item.date).getTime())));
+    const lastDate = new Date();
+
+    // Criar array com todos os meses do período
+    const allMonths: Record<string, any> = {};
+    const current = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+    
+    while (current <= lastDate) {
+      const monthKey = current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      allMonths[monthKey] = { 
+        month: monthKey, 
+        receitas: 0, 
+        despesas: 0, 
+        lucro: 0,
+        date: new Date(current)
+      };
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    // Processar dados existentes
+    trendData.forEach(item => {
       const date = new Date(item.date);
       const monthKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
       
-      if (!acc[monthKey]) {
-        acc[monthKey] = { month: monthKey, receitas: 0, despesas: 0, lucro: 0 };
+      if (allMonths[monthKey]) {
+        const amount = Number(item.amount);
+        if (item.type === 'entrada') {
+          allMonths[monthKey].receitas += amount;
+        } else if (item.type === 'saida') {
+          allMonths[monthKey].despesas += amount;
+        }
+        
+        allMonths[monthKey].lucro = allMonths[monthKey].receitas - allMonths[monthKey].despesas;
       }
-      
-      const amount = Number(item.amount);
-      if (item.type === 'entrada') {
-        acc[monthKey].receitas += amount;
-      } else if (item.type === 'saida') {
-        acc[monthKey].despesas += amount;
-      }
-      
-      acc[monthKey].lucro = acc[monthKey].receitas - acc[monthKey].despesas;
-      return acc;
-    }, {} as Record<string, any>);
+    });
 
-    return Object.values(monthlyTotals);
+    // Converter para array e ordenar por data
+    return Object.values(allMonths)
+      .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())
+      .map(({ date, ...rest }) => rest); // Remover a propriedade date do resultado final
   };
 
   // Processamento dados por banco
@@ -368,7 +386,7 @@ const Analise = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-orange-500" />
-                Tendência dos Últimos 6 Meses
+                Tendência Histórica Completa
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -376,8 +394,14 @@ const Analise = () => {
                 <ChartContainer config={chartConfig} className="h-[400px]">
                   <LineChart data={trendChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Line type="monotone" dataKey="receitas" stroke="#16a34a" strokeWidth={2} />
                     <Line type="monotone" dataKey="despesas" stroke="#dc2626" strokeWidth={2} />
