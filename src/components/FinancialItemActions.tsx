@@ -32,11 +32,12 @@ export const useFinancialItemActions = ({
   const { toast } = useToast();
 
   const handleEdit = (item: FinancialItem) => {
-    // Não permitir editar resumos mensais
-    if (item.source === 'financial_summary') {
+    // Não permitir editar resumos mensais ou resumos de receitas
+    if (item.source === 'financial_summary' || item.source === 'financial_summary_income') {
+      const type = item.source === 'financial_summary' ? 'gastos' : 'receitas';
       toast({
         title: "Aviso",
-        description: "Resumos mensais não podem ser editados individualmente. Use a importação para ajustar.",
+        description: `Resumos mensais de ${type} não podem ser editados individualmente. Use a importação para ajustar.`,
         variant: "destructive",
       });
       return;

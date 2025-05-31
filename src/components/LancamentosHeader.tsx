@@ -1,11 +1,12 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ClipboardPaste, Calendar } from "lucide-react";
+import { Plus, FileText, ClipboardPaste, Calendar, TrendingUp } from "lucide-react";
 import MonthSelector from "./MonthSelector";
 import CSVImportModal from "./CSVImportModal";
 import RawPasteModal from "./RawPasteModal";
 import MonthlySummaryModal from "./MonthlySummaryModal";
+import IncomeSummaryModal from "./IncomeSummaryModal";
 
 interface LancamentosHeaderProps {
   onNewEntry: () => void;
@@ -17,6 +18,7 @@ const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: Lancame
   const [showCSVModal, setShowCSVModal] = useState(false);
   const [showRawPasteModal, setShowRawPasteModal] = useState(false);
   const [showMonthlySummaryModal, setShowMonthlySummaryModal] = useState(false);
+  const [showIncomeSummaryModal, setShowIncomeSummaryModal] = useState(false);
 
   const handleImportSuccess = () => {
     // Força atualização da página
@@ -68,6 +70,15 @@ const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: Lancame
             <Calendar className="h-4 w-4 mr-2" />
             Resumos Mensais
           </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setShowIncomeSummaryModal(true)}
+            className="flex-1 sm:flex-none"
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Receitas Mensais
+          </Button>
         </div>
       </div>
 
@@ -86,6 +97,12 @@ const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: Lancame
       <MonthlySummaryModal
         isOpen={showMonthlySummaryModal}
         onClose={() => setShowMonthlySummaryModal(false)}
+        onSuccess={handleImportSuccess}
+      />
+
+      <IncomeSummaryModal
+        isOpen={showIncomeSummaryModal}
+        onClose={() => setShowIncomeSummaryModal(false)}
         onSuccess={handleImportSuccess}
       />
     </div>

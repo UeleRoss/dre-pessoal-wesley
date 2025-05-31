@@ -132,6 +132,36 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_summary_income: {
+        Row: {
+          created_at: string
+          id: string
+          month: string
+          source: string
+          total_value: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: string
+          source: string
+          total_value: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: string
+          source?: string
+          total_value?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       investment_categories: {
         Row: {
           created_at: string

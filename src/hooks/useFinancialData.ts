@@ -26,6 +26,15 @@ interface FinancialSummary {
   user_id: string;
 }
 
+interface IncomeSummary {
+  id: string;
+  created_at: string;
+  month: string;
+  source: string;
+  total_value: number;
+  user_id: string;
+}
+
 // Função para converter resumo mensal em formato de item para exibição
 const summaryToItem = (summary: FinancialSummary): FinancialItem => ({
   id: summary.id,
@@ -37,6 +46,20 @@ const summaryToItem = (summary: FinancialSummary): FinancialItem => ({
   category: summary.category,
   bank: 'RESUMO MENSAL',
   source: 'financial_summary',
+  user_id: summary.user_id
+});
+
+// Função para converter resumo de receitas em formato de item para exibição
+const incomeSummaryToItem = (summary: IncomeSummary): FinancialItem => ({
+  id: summary.id,
+  created_at: summary.created_at,
+  date: summary.month,
+  type: 'entrada', // Resumos de receita são entradas
+  amount: summary.total_value,
+  description: `Receita mensal - ${summary.source}`,
+  category: summary.source,
+  bank: 'RECEITA MENSAL',
+  source: 'financial_summary_income',
   user_id: summary.user_id
 });
 
@@ -58,7 +81,7 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       
       if (error) throw error;
       
-      // Também buscar resumos mensais
+      // Também buscar resumos mensais de gastos
       const { data: summaries, error: summariesError } = await supabase
         .from('financial_summary')
         .select('*')
@@ -66,9 +89,18 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       
       if (summariesError) throw summariesError;
       
+      // Buscar resumos mensais de receitas
+      const { data: incomeSummaries, error: incomeSummariesError } = await supabase
+        .from('financial_summary_income')
+        .select('*')
+        .order('month', { ascending: false });
+      
+      if (incomeSummariesError) throw incomeSummariesError;
+      
       // Converter resumos para formato de item e combinar
       const summaryItems = summaries?.map(summaryToItem) || [];
-      const combined = [...(data || []), ...summaryItems];
+      const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
+      const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
       
       // Ordenar por data
       combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -107,9 +139,18 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       
       if (summariesError) throw summariesError;
       
+      // Buscar resumos de receitas do mesmo período
+      const { data: incomeSummaries, error: incomeSummariesError } = await supabase
+        .from('financial_summary_income')
+        .select('*')
+        .eq('month', monthStr);
+      
+      if (incomeSummariesError) throw incomeSummariesError;
+      
       // Converter resumos para formato de item e combinar
       const summaryItems = summaries?.map(summaryToItem) || [];
-      const combined = [...(data || []), ...summaryItems];
+      const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
+      const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
       
       // Ordenar por data
       combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -143,10 +184,11 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         throw new Error("Nenhum item selecionado para deletar");
       }
 
-      // Separar IDs de financial_items dos de financial_summary
+      // Separar IDs de financial_items dos de financial_summary e financial_summary_income
       const itemsToDelete = allItems.filter(item => ids.includes(item.id));
-      const financialItemIds = itemsToDelete.filter(item => item.source !== 'financial_summary').map(item => item.id);
+      const financialItemIds = itemsToDelete.filter(item => item.source !== 'financial_summary' && item.source !== 'financial_summary_income').map(item => item.id);
       const summaryIds = itemsToDelete.filter(item => item.source === 'financial_summary').map(item => item.id);
+      const incomeSummaryIds = itemsToDelete.filter(item => item.source === 'financial_summary_income').map(item => item.id);
 
       let totalDeleted = 0;
 
@@ -188,6 +230,23 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         
         if (error) {
           console.error("Erro ao deletar resumos:", error);
+          throw error;
+        }
+        
+        totalDeleted += count || 0;
+      }
+
+      // Deletar financial_summary_income
+      if (incomeSummaryIds.length > 0) {
+        console.log(`Deletando ${incomeSummaryIds.length} resumos de receitas`);
+        
+        const { error, count } = await supabase
+          .from('financial_summary_income')
+          .delete()
+          .in('id', incomeSummaryIds);
+        
+        if (error) {
+          console.error("Erro ao deletar resumos de receitas:", error);
           throw error;
         }
         
