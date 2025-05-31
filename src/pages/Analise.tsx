@@ -11,6 +11,42 @@ import Auth from "@/components/Auth";
 
 const COLORS = ['#f97316', '#1e40af', '#16a34a', '#dc2626', '#9333ea', '#ea580c', '#0891b2', '#65a30d'];
 
+interface FinancialItem {
+  id: string;
+  created_at: string;
+  date: string;
+  type: string;
+  amount: number;
+  description: string;
+  category: string;
+  bank: string;
+  source: string | null;
+  user_id: string;
+}
+
+interface FinancialSummary {
+  id: string;
+  created_at: string;
+  month: string;
+  category: string;
+  total_value: number;
+  user_id: string;
+}
+
+// Função para converter resumo mensal em formato de item para análise
+const summaryToItem = (summary: FinancialSummary): FinancialItem => ({
+  id: summary.id,
+  created_at: summary.created_at,
+  date: summary.month,
+  type: 'saida', // Resumos são sempre saídas (gastos)
+  amount: summary.total_value,
+  description: `Resumo mensal - ${summary.category}`,
+  category: summary.category,
+  bank: 'RESUMO MENSAL',
+  source: 'financial_summary',
+  user_id: summary.user_id
+});
+
 const Analise = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [user, setUser] = useState<any>(null);
@@ -27,7 +63,7 @@ const Analise = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Dados do mês atual - sempre atualizado da tabela financial_items
+  // Dados do mês atual - incluindo resumos mensais
   const { data: monthlyData = [], refetch: refetchMonthly } = useQuery({
     queryKey: ['monthly-analysis', selectedMonth.getMonth(), selectedMonth.getFullYear(), user?.id],
     queryFn: async () => {
@@ -36,7 +72,8 @@ const Analise = () => {
       const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
       const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
       
-      const { data, error } = await supabase
+      // Buscar lançamentos detalhados
+      const { data: items, error } = await supabase
         .from('financial_items')
         .select('*')
         .gte('date', startDate.toISOString().split('T')[0])
@@ -45,14 +82,31 @@ const Analise = () => {
         .order('date', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // Buscar resumos mensais do mesmo período
+      const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
+      const { data: summaries, error: summariesError } = await supabase
+        .from('financial_summary')
+        .select('*')
+        .eq('month', monthStr)
+        .eq('user_id', user.id);
+      
+      if (summariesError) throw summariesError;
+      
+      // Converter resumos para formato de item e combinar
+      const summaryItems = summaries?.map(summaryToItem) || [];
+      const combined = [...(items || []), ...summaryItems];
+      
+      console.log(`Dados do mês: ${items?.length || 0} lançamentos + ${summaries?.length || 0} resumos = ${combined.length} total`);
+      
+      return combined;
     },
     enabled: !!user,
     refetchOnWindowFocus: true,
     staleTime: 0
   });
 
-  // Dados dos últimos 6 meses para tendência
+  // Dados dos últimos 6 meses para tendência - incluindo resumos
   const { data: trendData = [], refetch: refetchTrend } = useQuery({
     queryKey: ['trend-analysis', user?.id],
     queryFn: async () => {
@@ -62,7 +116,8 @@ const Analise = () => {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
       sixMonthsAgo.setDate(1);
       
-      const { data, error } = await supabase
+      // Buscar lançamentos detalhados
+      const { data: items, error } = await supabase
         .from('financial_items')
         .select('*')
         .gte('date', sixMonthsAgo.toISOString().split('T')[0])
@@ -70,7 +125,24 @@ const Analise = () => {
         .order('date', { ascending: true });
       
       if (error) throw error;
-      return data || [];
+      
+      // Buscar resumos mensais dos últimos 6 meses
+      const { data: summaries, error: summariesError } = await supabase
+        .from('financial_summary')
+        .select('*')
+        .gte('month', sixMonthsAgo.toISOString().split('T')[0])
+        .eq('user_id', user.id)
+        .order('month', { ascending: true });
+      
+      if (summariesError) throw summariesError;
+      
+      // Converter resumos para formato de item e combinar
+      const summaryItems = summaries?.map(summaryToItem) || [];
+      const combined = [...(items || []), ...summaryItems];
+      
+      console.log(`Dados de tendência: ${items?.length || 0} lançamentos + ${summaries?.length || 0} resumos = ${combined.length} total`);
+      
+      return combined;
     },
     enabled: !!user,
     refetchOnWindowFocus: true,
@@ -88,6 +160,19 @@ const Analise = () => {
             event: '*',
             schema: 'public',
             table: 'financial_items',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            refetchMonthly();
+            refetchTrend();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'financial_summary',
             filter: `user_id=eq.${user.id}`
           },
           () => {
@@ -269,6 +354,7 @@ const Analise = () => {
         </Card>
       </div>
 
+      {/* Tabs component with all the charts */}
       <Tabs defaultValue="tendencia" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="tendencia">Tendência</TabsTrigger>
