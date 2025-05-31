@@ -51,12 +51,31 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
       const monthDate = `${monthStr}-01`;
       console.log(`Data convertida: ${monthDate}`);
 
-      // Validar e converter valor
-      let cleanValue = valueStr.replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
-      console.log(`Valor limpo: "${cleanValue}"`);
+      // Validar e converter valor - CORRIGIDO para formato brasileiro
+      let cleanValue = valueStr.replace(/R\$\s?/, ''); // Remove R$
+      console.log(`Valor após remover R$: "${cleanValue}"`);
+      
+      // Para valores brasileiros: R$ 10.000,00
+      // Primeiro remove todos os pontos (separadores de milhares)
+      // Depois substitui a vírgula por ponto (separador decimal)
+      if (cleanValue.includes(',')) {
+        // Formato brasileiro: 10.000,00 ou 1.000.000,00
+        const parts = cleanValue.split(',');
+        if (parts.length === 2) {
+          // Remove pontos da parte inteira e mantém apenas os decimais
+          const integerPart = parts[0].replace(/\./g, '');
+          const decimalPart = parts[1];
+          cleanValue = `${integerPart}.${decimalPart}`;
+        }
+      } else {
+        // Se não tem vírgula, apenas remove os pontos (caso seja valor inteiro como 10.000)
+        cleanValue = cleanValue.replace(/\./g, '');
+      }
+      
+      console.log(`Valor final limpo: "${cleanValue}"`);
       
       const numericValue = parseFloat(cleanValue);
-      console.log(`Valor numérico: ${numericValue}`);
+      console.log(`Valor numérico convertido: ${numericValue}`);
       
       if (isNaN(numericValue) || numericValue <= 0) {
         errors.push(`Linha ${i + 1}: Valor inválido "${valueStr}" - deve ser maior que zero`);
