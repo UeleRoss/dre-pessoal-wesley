@@ -22,10 +22,10 @@ const Layout = () => {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-50 to-navy-100">
+    <div className="min-h-screen bg-gradient-to-br from-navy-50 to-navy-100 w-full">
       {/* Header */}
-      <header className="gradient-bg shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="gradient-bg shadow-lg sticky top-0 z-50 w-full">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-orange-500 rounded-lg">
@@ -63,7 +63,7 @@ const Layout = () => {
 
         {/* Mobile Navigation */}
         <div className="md:hidden border-t border-navy-600">
-          <div className="max-w-7xl mx-auto px-4">
+          <div className="w-full px-4">
             <div className="flex justify-around py-2">
               {navigation.map((item) => {
                 const isActive = location.pathname === item.href;
@@ -89,7 +89,7 @@ const Layout = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-6">
         <Outlet />
       </main>
     </div>
