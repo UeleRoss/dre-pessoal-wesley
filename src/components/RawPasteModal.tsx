@@ -1,6 +1,7 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -323,6 +324,9 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
       <DialogContent className="max-w-2xl">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Importar por Colagem (Raw Paste)</DialogTitle>
+          <DialogDescription>
+            Cole dados financeiros no formato texto para importação rápida
+          </DialogDescription>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
@@ -337,19 +341,20 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
             <div className="bg-gray-50 p-3 rounded mb-4 text-xs">
               <p><strong>Exemplo:</strong></p>
               <pre className="mt-1">
-05/02/2025	Salário Mensal	entrada	Pro-Labore	CONTA SIMPLES	5000,00
-06/02/2025	Compras Supermercado	saida	Comida	BRADESCO	150,75
-07/02/2025	Transferência PIX	transferencia	Entre bancos	C6 BANK	200,00
+05/02/2025	Salário Mensal	entrada	Pro-Labore	CONTA SIMPLES	R$ 5.000,00
+06/02/2025	Compras Supermercado	saida	Comida	BRADESCO	R$ 150,75
+07/02/2025	Transferência PIX	transferencia	Entre bancos	C6 BANK	R$ 200,00
               </pre>
             </div>
             
             <div className="text-xs text-gray-500 mb-4">
               <p><strong>Separadores aceitos:</strong> Tab, ponto e vírgula (;) ou espaços duplos</p>
-              <p><strong>Validações:</strong></p>
+              <p><strong>Validações aplicadas:</strong></p>
               <p>• Descrição obrigatória (linhas sem descrição são ignoradas)</p>
               <p>• Valor deve ser maior que zero</p>
               <p>• Data no formato DD/MM/AAAA ou AAAA-MM-DD</p>
               <p>• Duplicatas são ignoradas (mesmo data+descrição+valor)</p>
+              <p>• Valores com R$ e vírgula decimal são convertidos automaticamente</p>
             </div>
           </div>
 
