@@ -60,6 +60,15 @@ const FinancialItemsList = ({
   onDelete,
   onDeleteSelected
 }: FinancialItemsListProps) => {
+  
+  // Debug logs
+  console.log("📋 Lista recebeu:", {
+    filteredItems: filteredItems.length,
+    entradas: filteredItems.filter(item => item.type === 'entrada').length,
+    saidas: filteredItems.filter(item => item.type === 'saida').length,
+    receitas: filteredItems.filter(item => item.source === 'financial_summary_income').length
+  });
+  
   return (
     <Card>
       <CardHeader>

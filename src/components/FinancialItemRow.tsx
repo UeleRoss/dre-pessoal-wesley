@@ -30,6 +30,11 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
   const isIncomeSummary = item.source === 'financial_summary_income';
   const isSummary = isExpenseSummary || isIncomeSummary;
   
+  // Log para debug
+  if (isIncomeSummary) {
+    console.log("💰 Renderizando receita:", item);
+  }
+  
   const getBadgeColor = () => {
     if (isIncomeSummary) return 'bg-green-100 text-green-800 border-green-200';
     if (isExpenseSummary) return 'bg-blue-100 text-blue-800 border-blue-200';
