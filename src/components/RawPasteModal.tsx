@@ -321,51 +321,68 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Importar por Colagem (Raw Paste)</DialogTitle>
-          <DialogDescription>
-            Cole dados financeiros no formato texto para importação rápida
-          </DialogDescription>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Importar por Colagem (Raw Paste)</DialogTitle>
+              <DialogDescription>
+                Cole dados financeiros no formato texto para importação rápida
+              </DialogDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
               Cole seus dados no formato: <strong>data descrição tipo categoria banco valor</strong>
             </p>
             
-            <div className="bg-gray-50 p-3 rounded mb-4 text-xs">
-              <p><strong>Exemplo:</strong></p>
-              <pre className="mt-1">
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <p className="font-medium text-sm mb-2">Exemplo:</p>
+              <div className="bg-white p-3 rounded border overflow-x-auto">
+                <pre className="text-xs whitespace-pre-wrap break-all">
 05/02/2025	Salário Mensal	entrada	Pro-Labore	CONTA SIMPLES	R$ 5.000,00
 06/02/2025	Compras Supermercado	saida	Comida	BRADESCO	R$ 150,75
 07/02/2025	Transferência PIX	transferencia	Entre bancos	C6 BANK	R$ 200,00
-              </pre>
+                </pre>
+              </div>
             </div>
             
-            <div className="text-xs text-gray-500 mb-4">
-              <p><strong>Separadores aceitos:</strong> Tab, ponto e vírgula (;) ou espaços duplos</p>
-              <p><strong>Validações aplicadas:</strong></p>
-              <p>• Descrição obrigatória (linhas sem descrição são ignoradas)</p>
-              <p>• Valor deve ser maior que zero</p>
-              <p>• Data no formato DD/MM/AAAA ou AAAA-MM-DD</p>
-              <p>• Duplicatas são ignoradas (mesmo data+descrição+valor)</p>
-              <p>• Valores com R$ e vírgula decimal são convertidos automaticamente</p>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="text-xs text-blue-800 space-y-2">
+                <div>
+                  <p className="font-medium">Separadores aceitos:</p>
+                  <p>Tab, ponto e vírgula (;) ou espaços duplos</p>
+                </div>
+                <div>
+                  <p className="font-medium">Validações aplicadas:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Descrição obrigatória (linhas sem descrição são ignoradas)</li>
+                    <li>Valor deve ser maior que zero</li>
+                    <li>Data no formato DD/MM/AAAA ou AAAA-MM-DD</li>
+                    <li>Duplicatas são ignoradas (mesmo data+descrição+valor)</li>
+                    <li>Valores com R$ e vírgula decimal são convertidos automaticamente</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="rawtext">Cole seus dados aqui</Label>
+          <div className="space-y-2">
+            <Label htmlFor="rawtext" className="text-sm font-medium">
+              Cole seus dados aqui
+            </Label>
             <Textarea
               id="rawtext"
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
               placeholder="Cole suas linhas de dados aqui..."
-              className="min-h-[200px] font-mono text-sm"
+              className="min-h-[200px] font-mono text-sm resize-none"
             />
           </div>
 
