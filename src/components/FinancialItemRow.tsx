@@ -38,10 +38,24 @@ interface FinancialItemRowProps {
 }
 
 const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: FinancialItemRowProps) => {
-  const isMonthlySum = item.source === 'financial_summary';
+  const isExpenseSummary = item.source === 'financial_summary';
+  const isIncomeSummary = item.source === 'financial_summary_income';
+  const isSummary = isExpenseSummary || isIncomeSummary;
+  
+  const getBadgeColor = () => {
+    if (isIncomeSummary) return 'bg-green-100 text-green-800 border-green-200';
+    if (isExpenseSummary) return 'bg-blue-100 text-blue-800 border-blue-200';
+    return '';
+  };
+  
+  const getRowBgColor = () => {
+    if (isIncomeSummary) return 'bg-green-50 border-green-200';
+    if (isExpenseSummary) return 'bg-blue-50 border-blue-200';
+    return '';
+  };
   
   return (
-    <div className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 ${isMonthlySum ? 'bg-blue-50 border-blue-200' : ''}`}>
+    <div className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 ${getRowBgColor()}`}>
       <div className="flex items-center gap-3">
         <Checkbox
           checked={isSelected}
@@ -53,23 +67,28 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
             <Badge variant={item.type === 'entrada' ? 'default' : 'destructive'}>
               {item.type === 'entrada' ? 'Entrada' : 'Saída'}
             </Badge>
-            {isMonthlySum && (
-              <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                Resumo Mensal
+            {isIncomeSummary && (
+              <Badge variant="outline" className={getBadgeColor()}>
+                Resumo de Receitas
+              </Badge>
+            )}
+            {isExpenseSummary && (
+              <Badge variant="outline" className={getBadgeColor()}>
+                Resumo de Gastos
               </Badge>
             )}
             <span className="font-medium">{item.description}</span>
           </div>
           
           <div className="text-sm text-gray-600 flex gap-4">
-            <span>📅 {isMonthlySum ? `${formatBrazilDate(item.date)} (mês todo)` : formatBrazilDate(item.date)}</span>
+            <span>📅 {isSummary ? `${formatBrazilDate(item.date)} (mês todo)` : formatBrazilDate(item.date)}</span>
             <span>🏷️ {item.category}</span>
             <span>🏦 {item.bank}</span>
-            {item.source && item.source !== 'financial_summary' && <span>📁 {item.source}</span>}
+            {item.source && !isSummary && <span>📁 {item.source}</span>}
           </div>
           
           <div className="text-xs text-gray-400 mt-1">
-            {isMonthlySum ? 'Dados históricos agregados' : `Criado em: ${formatBrazilDateTime(item.created_at)}`}
+            {isSummary ? 'Dados históricos agregados' : `Criado em: ${formatBrazilDateTime(item.created_at)}`}
           </div>
         </div>
       </div>
@@ -91,8 +110,8 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
             variant="ghost"
             size="sm"
             onClick={() => onEdit(item)}
-            disabled={isMonthlySum}
-            title={isMonthlySum ? "Resumos mensais não podem ser editados" : "Editar lançamento"}
+            disabled={isSummary}
+            title={isSummary ? "Resumos não podem ser editados" : "Editar lançamento"}
           >
             <Edit className="h-4 w-4" />
           </Button>
@@ -105,9 +124,11 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Excluir {isMonthlySum ? 'Resumo Mensal' : 'Lançamento'}</AlertDialogTitle>
+                <AlertDialogTitle>
+                  Excluir {isIncomeSummary ? 'Resumo de Receitas' : isExpenseSummary ? 'Resumo de Gastos' : 'Lançamento'}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Tem certeza que deseja excluir este {isMonthlySum ? 'resumo mensal' : 'lançamento'}? Esta ação não pode ser desfeita.
+                  Tem certeza que deseja excluir este {isSummary ? 'resumo' : 'lançamento'}? Esta ação não pode ser desfeita.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
