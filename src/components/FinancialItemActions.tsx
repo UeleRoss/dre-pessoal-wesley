@@ -1,18 +1,6 @@
 
 import { useToast } from "@/hooks/use-toast";
-
-interface FinancialItem {
-  id: string;
-  created_at: string;
-  date: string;
-  type: string;
-  amount: number;
-  description: string;
-  category: string;
-  bank: string;
-  source: string | null;
-  user_id: string;
-}
+import { FinancialItem } from "@/types/financial";
 
 interface FinancialItemActionsProps {
   setEditingItem: (item: FinancialItem | null) => void;

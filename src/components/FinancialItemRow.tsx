@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Edit, Trash2 } from "lucide-react";
 import { formatBrazilDate, formatBrazilDateTime } from "@/utils/dateUtils";
+import { FinancialItem } from "@/types/financial";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,19 +16,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-interface FinancialItem {
-  id: string;
-  created_at: string;
-  date: string;
-  type: string;
-  amount: number;
-  description: string;
-  category: string;
-  bank: string;
-  source: string | null;
-  user_id: string;
-}
 
 interface FinancialItemRowProps {
   item: FinancialItem;

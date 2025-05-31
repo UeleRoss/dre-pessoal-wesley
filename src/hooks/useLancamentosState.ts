@@ -1,19 +1,7 @@
 
 import { useState } from "react";
 import { PeriodType } from "@/components/PeriodSelector";
-
-interface FinancialItem {
-  id: string;
-  created_at: string;
-  date: string;
-  type: string;
-  amount: number;
-  description: string;
-  category: string;
-  bank: string;
-  source: string | null;
-  user_id: string;
-}
+import { FinancialItem } from "@/types/financial";
 
 export const useLancamentosState = () => {
   const [searchTerm, setSearchTerm] = useState("");
