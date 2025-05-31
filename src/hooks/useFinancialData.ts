@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -74,12 +73,19 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
     queryFn: async () => {
       if (!user) return [];
       
+      console.log("Buscando todos os itens financeiros...");
+      
       const { data, error } = await supabase
         .from('financial_items')
         .select('*')
         .order('date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar financial_items:", error);
+        throw error;
+      }
+      
+      console.log("Financial items encontrados:", data?.length || 0);
       
       // Também buscar resumos mensais de gastos
       const { data: summaries, error: summariesError } = await supabase
@@ -87,7 +93,12 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         .select('*')
         .order('month', { ascending: false });
       
-      if (summariesError) throw summariesError;
+      if (summariesError) {
+        console.error("Erro ao buscar financial_summary:", summariesError);
+        throw summariesError;
+      }
+      
+      console.log("Resumos mensais encontrados:", summaries?.length || 0);
       
       // Buscar resumos mensais de receitas
       const { data: incomeSummaries, error: incomeSummariesError } = await supabase
@@ -95,12 +106,20 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         .select('*')
         .order('month', { ascending: false });
       
-      if (incomeSummariesError) throw incomeSummariesError;
+      if (incomeSummariesError) {
+        console.error("Erro ao buscar financial_summary_income:", incomeSummariesError);
+        throw incomeSummariesError;
+      }
+      
+      console.log("Resumos de receitas encontrados:", incomeSummaries?.length || 0);
       
       // Converter resumos para formato de item e combinar
       const summaryItems = summaries?.map(summaryToItem) || [];
       const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
       const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
+      
+      console.log("Total de itens combinados:", combined.length);
+      console.log("Resumos de receitas convertidos:", incomeSummaryItems);
       
       // Ordenar por data
       combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -120,6 +139,9 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
       const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
       
+      console.log(`Buscando dados do mês ${selectedMonth.getMonth() + 1}/${selectedMonth.getFullYear()}`);
+      console.log("Período:", startDate.toISOString().split('T')[0], "até", endDate.toISOString().split('T')[0]);
+      
       // Buscar lançamentos detalhados
       const { data, error } = await supabase
         .from('financial_items')
@@ -128,16 +150,28 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         .lte('date', endDate.toISOString().split('T')[0])
         .order('date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar financial_items do mês:", error);
+        throw error;
+      }
+      
+      console.log("Financial items do mês encontrados:", data?.length || 0);
       
       // Buscar resumos mensais do mesmo período
       const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
+      console.log("Buscando resumos para o mês:", monthStr);
+      
       const { data: summaries, error: summariesError } = await supabase
         .from('financial_summary')
         .select('*')
         .eq('month', monthStr);
       
-      if (summariesError) throw summariesError;
+      if (summariesError) {
+        console.error("Erro ao buscar financial_summary do mês:", summariesError);
+        throw summariesError;
+      }
+      
+      console.log("Resumos mensais do mês encontrados:", summaries?.length || 0);
       
       // Buscar resumos de receitas do mesmo período
       const { data: incomeSummaries, error: incomeSummariesError } = await supabase
@@ -145,12 +179,21 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         .select('*')
         .eq('month', monthStr);
       
-      if (incomeSummariesError) throw incomeSummariesError;
+      if (incomeSummariesError) {
+        console.error("Erro ao buscar financial_summary_income do mês:", incomeSummariesError);
+        throw incomeSummariesError;
+      }
+      
+      console.log("Resumos de receitas do mês encontrados:", incomeSummaries?.length || 0);
+      console.log("Dados dos resumos de receitas:", incomeSummaries);
       
       // Converter resumos para formato de item e combinar
       const summaryItems = summaries?.map(summaryToItem) || [];
       const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
       const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
+      
+      console.log("Total de itens do mês combinados:", combined.length);
+      console.log("Resumos de receitas do mês convertidos:", incomeSummaryItems);
       
       // Ordenar por data
       combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

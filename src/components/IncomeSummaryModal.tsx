@@ -18,13 +18,19 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
   const { toast } = useToast();
 
   const validateAndParseData = (text: string) => {
+    console.log("Texto recebido para validação:", text);
     const lines = text.trim().split('\n').filter(line => line.trim());
+    console.log("Linhas encontradas:", lines);
+    
     const parsedData = [];
     const errors = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      console.log(`Processando linha ${i + 1}:`, line);
+      
       const columns = line.split('\t');
+      console.log(`Colunas encontradas na linha ${i + 1}:`, columns);
       
       if (columns.length !== 3) {
         errors.push(`Linha ${i + 1}: Esperado 3 colunas, encontrado ${columns.length} - "${line}"`);
@@ -32,6 +38,7 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
       }
 
       const [monthStr, source, valueStr] = columns.map(col => col.trim());
+      console.log(`Dados extraídos - Mês: "${monthStr}", Fonte: "${source}", Valor: "${valueStr}"`);
 
       // Validar formato do mês (AAAA-MM)
       const monthMatch = monthStr.match(/^(\d{4})-(\d{2})$/);
@@ -42,10 +49,14 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
 
       // Converter mês para formato de data (AAAA-MM-01)
       const monthDate = `${monthStr}-01`;
+      console.log(`Data convertida: ${monthDate}`);
 
       // Validar e converter valor
-      let cleanValue = valueStr.replace(/R\$\s?/, '').replace(',', '.');
+      let cleanValue = valueStr.replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
+      console.log(`Valor limpo: "${cleanValue}"`);
+      
       const numericValue = parseFloat(cleanValue);
+      console.log(`Valor numérico: ${numericValue}`);
       
       if (isNaN(numericValue) || numericValue <= 0) {
         errors.push(`Linha ${i + 1}: Valor inválido "${valueStr}" - deve ser maior que zero`);
@@ -58,17 +69,24 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
         continue;
       }
 
-      parsedData.push({
+      const parsedItem = {
         month: monthDate,
         source: source.trim(),
         total_value: numericValue
-      });
+      };
+      
+      console.log(`Item validado:`, parsedItem);
+      parsedData.push(parsedItem);
     }
 
+    console.log("Dados finais validados:", parsedData);
+    console.log("Erros encontrados:", errors);
     return { parsedData, errors };
   };
 
   const handleImport = async () => {
+    console.log("Iniciando importação...");
+    
     if (!textData.trim()) {
       toast({
         title: "Erro",
@@ -84,6 +102,7 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
       const { parsedData, errors } = validateAndParseData(textData);
 
       if (errors.length > 0) {
+        console.error("Erros de validação:", errors);
         toast({
           title: "Erro de Validação",
           description: `Problemas encontrados:\n${errors.join('\n')}`,
@@ -103,10 +122,13 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
         return;
       }
 
+      console.log("Inserindo dados no Supabase:", parsedData);
+
       // Inserir dados no banco
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('financial_summary_income')
-        .insert(parsedData);
+        .insert(parsedData)
+        .select();
 
       if (error) {
         console.error("Erro ao inserir resumos de receita:", error);
@@ -117,6 +139,8 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
         });
         return;
       }
+
+      console.log("Dados inseridos com sucesso:", data);
 
       toast({
         title: "Sucesso",
@@ -157,11 +181,11 @@ const IncomeSummaryModal = ({ isOpen, onClose, onSuccess }: IncomeSummaryModalPr
               Cole os dados separados por TAB na ordem: <strong>mês, fonte, valor</strong>
             </p>
             <p className="text-xs text-gray-500 mb-4">
-              Formato esperado: AAAA-MM (ex: 2024-06), fonte da receita, valor com R$ e vírgula decimal
+              Formato esperado: AAAA-MM (ex: 2024-06), fonte da receita, valor com R$ opcional
             </p>
             <Textarea
-              placeholder="2024-06	Vendas Online	R$ 15.230,50
-2024-07	Consultoria	R$ 8.500,00"
+              placeholder="2024-06	Go On Outdoor	R$ 4.000,00
+2024-07	Consultoria	8.500,00"
               value={textData}
               onChange={(e) => setTextData(e.target.value)}
               className="min-h-[200px] font-mono text-sm"
