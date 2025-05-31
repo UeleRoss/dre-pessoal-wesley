@@ -22,6 +22,29 @@ interface FinancialItem {
   user_id: string;
 }
 
+interface FinancialSummary {
+  id: string;
+  created_at: string;
+  month: string;
+  category: string;
+  total_value: number;
+  user_id: string;
+}
+
+// Função para converter resumo mensal em formato de item para exibição
+const summaryToItem = (summary: FinancialSummary): FinancialItem => ({
+  id: summary.id,
+  created_at: summary.created_at,
+  date: summary.month,
+  type: 'saida', // Resumos são sempre saídas (gastos)
+  amount: summary.total_value,
+  description: `Resumo mensal - ${summary.category}`,
+  category: summary.category,
+  bank: 'RESUMO MENSAL',
+  source: 'financial_summary',
+  user_id: summary.user_id
+});
+
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 const CATEGORIES = [
   "Carro", "Comida", "Contas Mensais", "Entre bancos", "Escritório", 
@@ -69,8 +92,24 @@ const Lancamentos = () => {
         .order('date', { ascending: false });
       
       if (error) throw error;
-      setAllItems(data || []);
-      return data;
+      
+      // Também buscar resumos mensais
+      const { data: summaries, error: summariesError } = await supabase
+        .from('financial_summary')
+        .select('*')
+        .order('month', { ascending: false });
+      
+      if (summariesError) throw summariesError;
+      
+      // Converter resumos para formato de item e combinar
+      const summaryItems = summaries?.map(summaryToItem) || [];
+      const combined = [...(data || []), ...summaryItems];
+      
+      // Ordenar por data
+      combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setAllItems(combined);
+      return combined;
     },
     enabled: !!user
   });
@@ -84,6 +123,7 @@ const Lancamentos = () => {
       const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
       const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
       
+      // Buscar lançamentos detalhados
       const { data, error } = await supabase
         .from('financial_items')
         .select('*')
@@ -92,8 +132,25 @@ const Lancamentos = () => {
         .order('date', { ascending: false });
       
       if (error) throw error;
-      setItems(data || []);
-      return data;
+      
+      // Buscar resumos mensais do mesmo período
+      const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
+      const { data: summaries, error: summariesError } = await supabase
+        .from('financial_summary')
+        .select('*')
+        .eq('month', monthStr);
+      
+      if (summariesError) throw summariesError;
+      
+      // Converter resumos para formato de item e combinar
+      const summaryItems = summaries?.map(summaryToItem) || [];
+      const combined = [...(data || []), ...summaryItems];
+      
+      // Ordenar por data
+      combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setItems(combined);
+      return combined;
     },
     enabled: !!user
   });
@@ -153,37 +210,58 @@ const Lancamentos = () => {
         throw new Error("Nenhum item selecionado para deletar");
       }
 
-      // Processar em lotes de 50 itens para evitar URLs muito longas
-      const batchSize = 50;
-      const batches = [];
-      
-      for (let i = 0; i < ids.length; i += batchSize) {
-        batches.push(ids.slice(i, i + batchSize));
-      }
-
-      console.log(`Processando ${batches.length} lotes de até ${batchSize} itens cada`);
+      // Separar IDs de financial_items dos de financial_summary
+      const itemsToDelete = allItems.filter(item => ids.includes(item.id));
+      const financialItemIds = itemsToDelete.filter(item => item.source !== 'financial_summary').map(item => item.id);
+      const summaryIds = itemsToDelete.filter(item => item.source === 'financial_summary').map(item => item.id);
 
       let totalDeleted = 0;
-      
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        console.log(`Deletando lote ${i + 1}/${batches.length} com ${batch.length} itens`);
+
+      // Deletar financial_items
+      if (financialItemIds.length > 0) {
+        const batchSize = 50;
+        const batches = [];
+        
+        for (let i = 0; i < financialItemIds.length; i += batchSize) {
+          batches.push(financialItemIds.slice(i, i + batchSize));
+        }
+
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          console.log(`Deletando lote ${i + 1}/${batches.length} de financial_items com ${batch.length} itens`);
+          
+          const { error, count } = await supabase
+            .from('financial_items')
+            .delete()
+            .in('id', batch);
+          
+          if (error) {
+            console.error(`Erro no lote ${i + 1}:`, error);
+            throw error;
+          }
+          
+          totalDeleted += count || 0;
+        }
+      }
+
+      // Deletar financial_summary
+      if (summaryIds.length > 0) {
+        console.log(`Deletando ${summaryIds.length} resumos mensais`);
         
         const { error, count } = await supabase
-          .from('financial_items')
+          .from('financial_summary')
           .delete()
-          .in('id', batch);
+          .in('id', summaryIds);
         
         if (error) {
-          console.error(`Erro no lote ${i + 1}:`, error);
+          console.error("Erro ao deletar resumos:", error);
           throw error;
         }
         
         totalDeleted += count || 0;
-        console.log(`Lote ${i + 1} deletado com sucesso. Total deletado até agora: ${totalDeleted}`);
       }
       
-      console.log(`Todos os lotes processados. Total final deletado: ${totalDeleted}`);
+      console.log(`Total final deletado: ${totalDeleted}`);
       return { totalDeleted };
     },
     onSuccess: (data) => {
@@ -206,6 +284,15 @@ const Lancamentos = () => {
   });
 
   const handleEdit = (item: FinancialItem) => {
+    // Não permitir editar resumos mensais
+    if (item.source === 'financial_summary') {
+      toast({
+        title: "Aviso",
+        description: "Resumos mensais não podem ser editados individualmente. Use a importação para ajustar.",
+        variant: "destructive",
+      });
+      return;
+    }
     setEditingItem(item);
   };
 
