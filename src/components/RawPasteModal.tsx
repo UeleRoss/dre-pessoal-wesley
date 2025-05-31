@@ -160,6 +160,43 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
     return result;
   };
 
+  const detectFormat = (line: string): 'format1' | 'format2' => {
+    // Detecta separador
+    let values;
+    if (line.includes('\t')) {
+      values = line.split('\t');
+    } else if (line.includes(';')) {
+      values = line.split(';');
+    } else {
+      values = line.split(/\s{2,}/);
+    }
+    
+    values = values.map(v => v.trim());
+    
+    if (values.length < 6) return 'format1';
+    
+    // Tenta detectar o formato pelos valores
+    // Se o 3º campo tem R$ ou é numérico, provavelmente é: data descrição valor tipo banco categoria
+    const thirdField = values[2];
+    const fourthField = values[3];
+    
+    // Se o 3º campo tem símbolos de moeda ou é claramente numérico
+    if (thirdField.includes('R$') || thirdField.includes('$') || /^[\d.,]+$/.test(thirdField.replace(/R\$\s*/g, ''))) {
+      console.log('Formato detectado: data descrição valor tipo banco categoria');
+      return 'format2';
+    }
+    
+    // Se o 4º campo tem símbolos de tipo (entrada/saída)
+    if (['entrada', 'saida', 'saída', 'transferencia', 'transferência'].some(type => 
+        fourthField.toLowerCase().includes(type.toLowerCase()))) {
+      console.log('Formato detectado: data descrição tipo categoria banco valor');
+      return 'format1';
+    }
+    
+    // Default para formato original
+    return 'format1';
+  };
+
   const parseRawText = (text: string) => {
     const lines = text.split('\n').filter(line => line.trim() !== '');
     console.log('Total de linhas encontradas:', lines.length);
@@ -185,14 +222,30 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
         return null;
       }
       
-      return {
-        date: values[0] || '',
-        description: values[1] || '',
-        type: values[2] || '',
-        category: values[3] || '',
-        bank: values[4] || '',
-        amount: values[5] || ''
-      };
+      // Detecta o formato da linha
+      const format = detectFormat(line);
+      
+      if (format === 'format2') {
+        // Formato: data descrição valor tipo banco categoria
+        return {
+          date: values[0] || '',
+          description: values[1] || '',
+          amount: values[2] || '',
+          type: values[3] || '',
+          bank: values[4] || '',
+          category: values[5] || ''
+        };
+      } else {
+        // Formato original: data descrição tipo categoria banco valor
+        return {
+          date: values[0] || '',
+          description: values[1] || '',
+          type: values[2] || '',
+          category: values[3] || '',
+          bank: values[4] || '',
+          amount: values[5] || ''
+        };
+      }
     }).filter(Boolean);
   };
 
@@ -339,17 +392,28 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
         <div className="space-y-6">
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Cole seus dados no formato: <strong>data descrição tipo categoria banco valor</strong>
+              O sistema detecta automaticamente entre dois formatos:
             </p>
             
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <p className="font-medium text-sm mb-2">Exemplo:</p>
-              <div className="bg-white p-3 rounded border overflow-x-auto">
-                <pre className="text-xs whitespace-pre-wrap break-all">
+            <div className="bg-gray-50 p-4 rounded-lg border space-y-4">
+              <div>
+                <p className="font-medium text-sm mb-2">Formato 1 (original):</p>
+                <p className="text-xs text-gray-600 mb-2"><strong>data descrição tipo categoria banco valor</strong></p>
+                <div className="bg-white p-3 rounded border overflow-x-auto">
+                  <pre className="text-xs whitespace-pre-wrap break-all">
 05/02/2025	Salário Mensal	entrada	Pro-Labore	CONTA SIMPLES	R$ 5.000,00
-06/02/2025	Compras Supermercado	saida	Comida	BRADESCO	R$ 150,75
-07/02/2025	Transferência PIX	transferencia	Entre bancos	C6 BANK	R$ 200,00
-                </pre>
+                  </pre>
+                </div>
+              </div>
+              
+              <div>
+                <p className="font-medium text-sm mb-2">Formato 2 (seu formato):</p>
+                <p className="text-xs text-gray-600 mb-2"><strong>data descrição valor tipo banco categoria</strong></p>
+                <div className="bg-white p-3 rounded border overflow-x-auto">
+                  <pre className="text-xs whitespace-pre-wrap break-all">
+2025-05-30	blackdog	R$ 46,00	Saída	C6 BANK	Comida
+                  </pre>
+                </div>
               </div>
             </div>
             
@@ -367,6 +431,7 @@ const RawPasteModal = ({ isOpen, onClose, onSuccess }: RawPasteModalProps) => {
                     <li>Data no formato DD/MM/AAAA ou AAAA-MM-DD</li>
                     <li>Duplicatas são ignoradas (mesmo data+descrição+valor)</li>
                     <li>Valores com R$ e vírgula decimal são convertidos automaticamente</li>
+                    <li>Sistema detecta automaticamente qual formato você está usando</li>
                   </ul>
                 </div>
               </div>
