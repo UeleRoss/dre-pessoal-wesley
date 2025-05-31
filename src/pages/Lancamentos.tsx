@@ -36,6 +36,8 @@ const Lancamentos = () => {
     setEditingItem,
     selectedMonth,
     setSelectedMonth,
+    periodType,
+    setPeriodType,
     selectedItems,
     setSelectedItems,
     handleClearFilters,
@@ -51,7 +53,7 @@ const Lancamentos = () => {
     refetch,
     deleteMutation,
     deleteMultipleMutation
-  } = useFinancialData(user, selectedMonth);
+  } = useFinancialData(user, selectedMonth, periodType);
 
   const {
     handleEdit,
@@ -90,6 +92,8 @@ const Lancamentos = () => {
         onNewEntry={() => setShowNewEntryModal(true)}
         selectedMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
+        periodType={periodType}
+        onPeriodTypeChange={setPeriodType}
       />
 
       <LancamentosFilters

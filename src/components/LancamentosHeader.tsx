@@ -1,10 +1,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ClipboardPaste, Calendar, TrendingUp } from "lucide-react";
-import MonthSelector from "./MonthSelector";
-import CSVImportModal from "./CSVImportModal";
-import RawPasteModal from "./RawPasteModal";
+import { Plus, Calendar, TrendingUp } from "lucide-react";
+import PeriodSelector, { PeriodType } from "./PeriodSelector";
 import MonthlySummaryModal from "./MonthlySummaryModal";
 import IncomeSummaryModal from "./IncomeSummaryModal";
 
@@ -12,11 +10,17 @@ interface LancamentosHeaderProps {
   onNewEntry: () => void;
   selectedMonth: Date;
   onMonthChange: (date: Date) => void;
+  periodType: PeriodType;
+  onPeriodTypeChange: (type: PeriodType) => void;
 }
 
-const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: LancamentosHeaderProps) => {
-  const [showCSVModal, setShowCSVModal] = useState(false);
-  const [showRawPasteModal, setShowRawPasteModal] = useState(false);
+const LancamentosHeader = ({ 
+  onNewEntry, 
+  selectedMonth, 
+  onMonthChange, 
+  periodType, 
+  onPeriodTypeChange 
+}: LancamentosHeaderProps) => {
   const [showMonthlySummaryModal, setShowMonthlySummaryModal] = useState(false);
   const [showIncomeSummaryModal, setShowIncomeSummaryModal] = useState(false);
 
@@ -33,33 +37,17 @@ const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: Lancame
       </div>
       
       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-        <MonthSelector 
+        <PeriodSelector 
           selectedMonth={selectedMonth}
           onMonthChange={onMonthChange}
+          periodType={periodType}
+          onPeriodTypeChange={onPeriodTypeChange}
         />
         
         <div className="flex gap-2">
           <Button onClick={onNewEntry} className="flex-1 sm:flex-none">
             <Plus className="h-4 w-4 mr-2" />
             Novo Lançamento
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={() => setShowCSVModal(true)}
-            className="flex-1 sm:flex-none"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Importar CSV/XLSX
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={() => setShowRawPasteModal(true)}
-            className="flex-1 sm:flex-none"
-          >
-            <ClipboardPaste className="h-4 w-4 mr-2" />
-            Raw Paste
           </Button>
           
           <Button 
@@ -81,18 +69,6 @@ const LancamentosHeader = ({ onNewEntry, selectedMonth, onMonthChange }: Lancame
           </Button>
         </div>
       </div>
-
-      <CSVImportModal
-        isOpen={showCSVModal}
-        onClose={() => setShowCSVModal(false)}
-        onSuccess={handleImportSuccess}
-      />
-
-      <RawPasteModal
-        isOpen={showRawPasteModal}
-        onClose={() => setShowRawPasteModal(false)}
-        onSuccess={handleImportSuccess}
-      />
 
       <MonthlySummaryModal
         isOpen={showMonthlySummaryModal}

@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { PeriodType } from "@/components/PeriodSelector";
 
 interface FinancialItem {
   id: string;
@@ -22,6 +23,7 @@ export const useLancamentosState = () => {
   const [showNewEntryModal, setShowNewEntryModal] = useState(false);
   const [editingItem, setEditingItem] = useState<FinancialItem | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [periodType, setPeriodType] = useState<PeriodType>('month');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   const handleClearFilters = () => {
@@ -85,6 +87,8 @@ export const useLancamentosState = () => {
     setEditingItem,
     selectedMonth,
     setSelectedMonth,
+    periodType,
+    setPeriodType,
     selectedItems,
     setSelectedItems,
     handleClearFilters,

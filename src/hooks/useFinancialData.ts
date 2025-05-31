@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { PeriodType } from "@/components/PeriodSelector";
 
 interface FinancialItem {
   id: string;
@@ -62,7 +63,7 @@ const incomeSummaryToItem = (summary: IncomeSummary): FinancialItem => ({
   user_id: summary.user_id
 });
 
-export const useFinancialData = (user: any, selectedMonth: Date) => {
+export const useFinancialData = (user: any, selectedMonth: Date, periodType: PeriodType) => {
   const [allItems, setAllItems] = useState<FinancialItem[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -87,7 +88,7 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       
       console.log("Financial items encontrados:", data?.length || 0);
       
-      // Também buscar resumos mensais de gastos
+      // ... keep existing code (fetch summaries)
       const { data: summaries, error: summariesError } = await supabase
         .from('financial_summary')
         .select('*')
@@ -100,7 +101,6 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       
       console.log("Resumos mensais encontrados:", summaries?.length || 0);
       
-      // Buscar resumos mensais de receitas
       const { data: incomeSummaries, error: incomeSummariesError } = await supabase
         .from('financial_summary_income')
         .select('*')
@@ -113,15 +113,12 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
       
       console.log("Resumos de receitas encontrados:", incomeSummaries?.length || 0);
       
-      // Converter resumos para formato de item e combinar
       const summaryItems = summaries?.map(summaryToItem) || [];
       const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
       const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
       
       console.log("Total de itens combinados:", combined.length);
-      console.log("Resumos de receitas convertidos:", incomeSummaryItems);
       
-      // Ordenar por data
       combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       setAllItems(combined);
@@ -130,75 +127,155 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
     enabled: !!user
   });
 
-  // Buscar lançamentos financeiros do mês selecionado
+  // Buscar lançamentos financeiros baseado no tipo de período
   const { data: financialItems = [], refetch } = useQuery({
-    queryKey: ['financial-items', selectedMonth.getMonth(), selectedMonth.getFullYear()],
+    queryKey: ['financial-items', periodType, selectedMonth.getMonth(), selectedMonth.getFullYear()],
     queryFn: async () => {
       if (!user) return [];
       
-      const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
-      const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+      let startDate: string;
+      let endDate: string;
+      let monthStr: string;
+
+      if (periodType === 'all') {
+        console.log("Buscando todos os dados sem filtro de data");
+        
+        // Para 'all', buscar todos os dados sem filtro de data
+        const { data, error } = await supabase
+          .from('financial_items')
+          .select('*')
+          .order('date', { ascending: false });
+        
+        if (error) {
+          console.error("Erro ao buscar todos os financial_items:", error);
+          throw error;
+        }
+        
+        // Buscar todos os resumos também
+        const { data: summaries, error: summariesError } = await supabase
+          .from('financial_summary')
+          .select('*')
+          .order('month', { ascending: false });
+        
+        if (summariesError) {
+          console.error("Erro ao buscar todos os financial_summary:", summariesError);
+          throw summariesError;
+        }
+        
+        const { data: incomeSummaries, error: incomeSummariesError } = await supabase
+          .from('financial_summary_income')
+          .select('*')
+          .order('month', { ascending: false });
+        
+        if (incomeSummariesError) {
+          console.error("Erro ao buscar todos os financial_summary_income:", incomeSummariesError);
+          throw incomeSummariesError;
+        }
+        
+        const summaryItems = summaries?.map(summaryToItem) || [];
+        const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
+        const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
+        
+        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        console.log("Total de itens (todos os dados):", combined.length);
+        return combined;
+      }
       
-      console.log(`Buscando dados do mês ${selectedMonth.getMonth() + 1}/${selectedMonth.getFullYear()}`);
-      console.log("Período:", startDate.toISOString().split('T')[0], "até", endDate.toISOString().split('T')[0]);
+      if (periodType === 'year') {
+        startDate = new Date(selectedMonth.getFullYear(), 0, 1).toISOString().split('T')[0];
+        endDate = new Date(selectedMonth.getFullYear(), 11, 31).toISOString().split('T')[0];
+        console.log(`Buscando dados do ano ${selectedMonth.getFullYear()}`);
+      } else {
+        startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).toISOString().split('T')[0];
+        endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).toISOString().split('T')[0];
+        console.log(`Buscando dados do mês ${selectedMonth.getMonth() + 1}/${selectedMonth.getFullYear()}`);
+      }
+      
+      console.log("Período:", startDate, "até", endDate);
       
       // Buscar lançamentos detalhados
       const { data, error } = await supabase
         .from('financial_items')
         .select('*')
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
+        .gte('date', startDate)
+        .lte('date', endDate)
         .order('date', { ascending: false });
       
       if (error) {
-        console.error("Erro ao buscar financial_items do mês:", error);
+        console.error("Erro ao buscar financial_items do período:", error);
         throw error;
       }
       
-      console.log("Financial items do mês encontrados:", data?.length || 0);
+      console.log("Financial items do período encontrados:", data?.length || 0);
       
-      // Buscar resumos mensais do mesmo período
-      const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
-      console.log("Buscando resumos para o mês:", monthStr);
-      
-      const { data: summaries, error: summariesError } = await supabase
-        .from('financial_summary')
-        .select('*')
-        .eq('month', monthStr);
-      
-      if (summariesError) {
-        console.error("Erro ao buscar financial_summary do mês:", summariesError);
-        throw summariesError;
+      // Para resumos, buscar baseado no período
+      if (periodType === 'year') {
+        // Para ano, buscar todos os meses do ano
+        const { data: summaries, error: summariesError } = await supabase
+          .from('financial_summary')
+          .select('*')
+          .gte('month', `${selectedMonth.getFullYear()}-01-01`)
+          .lte('month', `${selectedMonth.getFullYear()}-12-01`);
+        
+        if (summariesError) {
+          console.error("Erro ao buscar financial_summary do ano:", summariesError);
+          throw summariesError;
+        }
+        
+        const { data: incomeSummaries, error: incomeSummariesError } = await supabase
+          .from('financial_summary_income')
+          .select('*')
+          .gte('month', `${selectedMonth.getFullYear()}-01-01`)
+          .lte('month', `${selectedMonth.getFullYear()}-12-01`);
+        
+        if (incomeSummariesError) {
+          console.error("Erro ao buscar financial_summary_income do ano:", incomeSummariesError);
+          throw incomeSummariesError;
+        }
+        
+        const summaryItems = summaries?.map(summaryToItem) || [];
+        const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
+        const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
+        
+        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        console.log("Total de itens do ano combinados:", combined.length);
+        return combined;
+      } else {
+        // Para mês, manter lógica existente
+        monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
+        console.log("Buscando resumos para o mês:", monthStr);
+        
+        const { data: summaries, error: summariesError } = await supabase
+          .from('financial_summary')
+          .select('*')
+          .eq('month', monthStr);
+        
+        if (summariesError) {
+          console.error("Erro ao buscar financial_summary do mês:", summariesError);
+          throw summariesError;
+        }
+        
+        const { data: incomeSummaries, error: incomeSummariesError } = await supabase
+          .from('financial_summary_income')
+          .select('*')
+          .eq('month', monthStr);
+        
+        if (incomeSummariesError) {
+          console.error("Erro ao buscar financial_summary_income do mês:", incomeSummariesError);
+          throw incomeSummariesError;
+        }
+        
+        const summaryItems = summaries?.map(summaryToItem) || [];
+        const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
+        const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
+        
+        combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        console.log("Total de itens do mês combinados:", combined.length);
+        return combined;
       }
-      
-      console.log("Resumos mensais do mês encontrados:", summaries?.length || 0);
-      
-      // Buscar resumos de receitas do mesmo período
-      const { data: incomeSummaries, error: incomeSummariesError } = await supabase
-        .from('financial_summary_income')
-        .select('*')
-        .eq('month', monthStr);
-      
-      if (incomeSummariesError) {
-        console.error("Erro ao buscar financial_summary_income do mês:", incomeSummariesError);
-        throw incomeSummariesError;
-      }
-      
-      console.log("Resumos de receitas do mês encontrados:", incomeSummaries?.length || 0);
-      console.log("Dados dos resumos de receitas:", incomeSummaries);
-      
-      // Converter resumos para formato de item e combinar
-      const summaryItems = summaries?.map(summaryToItem) || [];
-      const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
-      const combined = [...(data || []), ...summaryItems, ...incomeSummaryItems];
-      
-      console.log("Total de itens do mês combinados:", combined.length);
-      console.log("Resumos de receitas do mês convertidos:", incomeSummaryItems);
-      
-      // Ordenar por data
-      combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      return combined;
     },
     enabled: !!user
   });
@@ -227,7 +304,6 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         throw new Error("Nenhum item selecionado para deletar");
       }
 
-      // Separar IDs de financial_items dos de financial_summary e financial_summary_income
       const itemsToDelete = allItems.filter(item => ids.includes(item.id));
       const financialItemIds = itemsToDelete.filter(item => item.source !== 'financial_summary' && item.source !== 'financial_summary_income').map(item => item.id);
       const summaryIds = itemsToDelete.filter(item => item.source === 'financial_summary').map(item => item.id);
@@ -235,7 +311,6 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
 
       let totalDeleted = 0;
 
-      // Deletar financial_items
       if (financialItemIds.length > 0) {
         const batchSize = 50;
         const batches = [];
@@ -262,7 +337,6 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         }
       }
 
-      // Deletar financial_summary
       if (summaryIds.length > 0) {
         console.log(`Deletando ${summaryIds.length} resumos mensais`);
         
@@ -279,7 +353,6 @@ export const useFinancialData = (user: any, selectedMonth: Date) => {
         totalDeleted += count || 0;
       }
 
-      // Deletar financial_summary_income
       if (incomeSummaryIds.length > 0) {
         console.log(`Deletando ${incomeSummaryIds.length} resumos de receitas`);
         
