@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -72,7 +71,18 @@ const Analise = () => {
       let startDate: string;
       let endDate: string;
       
-      if (periodType === 'year') {
+      if (periodType === 'all') {
+        // Para "todos", buscar todos os dados do usuário
+        const { data: items, error } = await supabase
+          .from('financial_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false });
+        
+        if (error) throw error;
+        console.log(`📊 ANÁLISE (TODOS): Encontrados ${items?.length || 0} lançamentos diretos`);
+        return items || [];
+      } else if (periodType === 'year') {
         startDate = new Date(selectedMonth.getFullYear(), 0, 1).toISOString().split('T')[0];
         endDate = new Date(selectedMonth.getFullYear(), 11, 31).toISOString().split('T')[0];
       } else {
@@ -398,6 +408,9 @@ const Analise = () => {
   };
 
   const getPeriodTitle = () => {
+    if (periodType === 'all') {
+      return 'Todos os dados';
+    }
     if (periodType === 'year') {
       return selectedMonth.getFullYear().toString();
     }
@@ -413,23 +426,19 @@ const Analise = () => {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <MonthSelector 
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-        />
-        <PeriodSelector 
-          selectedPeriod={periodType}
-          onPeriodChange={setPeriodType}
-        />
-      </div>
+      <PeriodSelector 
+        selectedMonth={selectedMonth}
+        periodType={periodType}
+        onMonthChange={setSelectedMonth}
+        onPeriodTypeChange={setPeriodType}
+      />
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Receitas {periodType === 'year' ? 'do Ano' : 'do Mês'}
+              Receitas {periodType === 'all' ? 'Totais' : periodType === 'year' ? 'do Ano' : 'do Mês'}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
@@ -446,7 +455,7 @@ const Analise = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Despesas {periodType === 'year' ? 'do Ano' : 'do Mês'}
+              Despesas {periodType === 'all' ? 'Totais' : periodType === 'year' ? 'do Ano' : 'do Mês'}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-red-600 rotate-180" />
           </CardHeader>
