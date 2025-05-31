@@ -254,11 +254,11 @@ const Analise = () => {
   const processPeriodData = () => {
     const revenue = periodData
       .filter(item => item.type === 'entrada')
-      .reduce((sum, item) => sum + Number(item.amount), 0);
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
     
     const expenses = periodData
       .filter(item => item.type === 'saida')
-      .reduce((sum, item) => sum + Number(item.amount), 0);
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
     
     const profit = revenue - expenses;
     
@@ -271,7 +271,7 @@ const Analise = () => {
       .filter(item => item.type === 'saida')
       .reduce((acc, item) => {
         const category = item.category || 'Sem categoria';
-        acc[category] = (acc[category] || 0) + Number(item.amount);
+        acc[category] = (acc[category] || 0) + Number(item.amount || 0);
         return acc;
       }, {} as Record<string, number>);
 
@@ -310,7 +310,7 @@ const Analise = () => {
       const monthKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
       
       if (allMonths[monthKey]) {
-        const amount = Number(item.amount);
+        const amount = Number(item.amount || 0);
         if (item.type === 'entrada') {
           allMonths[monthKey].receitas += amount;
         } else if (item.type === 'saida') {
@@ -336,7 +336,7 @@ const Analise = () => {
         acc[bank] = { receitas: 0, despesas: 0 };
       }
       
-      const amount = Number(item.amount);
+      const amount = Number(item.amount || 0);
       if (item.type === 'entrada') {
         acc[bank].receitas += amount;
       } else if (item.type === 'saida') {
@@ -360,7 +360,7 @@ const Analise = () => {
       .filter(item => item.type === 'entrada')
       .reduce((acc, item) => {
         const source = item.category || 'Outras receitas';
-        acc[source] = (acc[source] || 0) + Number(item.amount);
+        acc[source] = (acc[source] || 0) + Number(item.amount || 0);
         return acc;
       }, {} as Record<string, number>);
 
@@ -368,7 +368,7 @@ const Analise = () => {
       .filter(item => item.type === 'saida')
       .reduce((acc, item) => {
         const category = item.category || 'Outras despesas';
-        acc[category] = (acc[category] || 0) + Number(item.amount);
+        acc[category] = (acc[category] || 0) + Number(item.amount || 0);
         return acc;
       }, {} as Record<string, number>);
 
