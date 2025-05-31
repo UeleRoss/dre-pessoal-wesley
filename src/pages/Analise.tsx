@@ -63,7 +63,7 @@ const Analise = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Dados do período atual - incluindo resumos mensais
+  // Dados do período atual - APENAS lançamentos diretos (SEM resumos para evitar duplicação)
   const { data: periodData = [], refetch: refetchPeriod } = useQuery({
     queryKey: ['period-analysis', periodType, selectedMonth.getMonth(), selectedMonth.getFullYear(), user?.id],
     queryFn: async () => {
@@ -80,7 +80,9 @@ const Analise = () => {
         endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).toISOString().split('T')[0];
       }
       
-      // Buscar lançamentos detalhados
+      console.log(`🔍 ANÁLISE: Buscando dados de ${startDate} até ${endDate} para usuário: ${user.id}`);
+      
+      // Buscar APENAS lançamentos detalhados (sem resumos mensais para evitar duplicação)
       const { data: items, error } = await supabase
         .from('financial_items')
         .select('*')
@@ -91,67 +93,35 @@ const Analise = () => {
       
       if (error) throw error;
       
-      // Buscar resumos de gastos do período
-      let summariesQuery;
-      if (periodType === 'year') {
-        summariesQuery = supabase
-          .from('financial_summary')
-          .select('*')
-          .gte('month', `${selectedMonth.getFullYear()}-01-01`)
-          .lte('month', `${selectedMonth.getFullYear()}-12-01`)
-          .eq('user_id', user.id);
-      } else {
-        const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
-        summariesQuery = supabase
-          .from('financial_summary')
-          .select('*')
-          .eq('month', monthStr)
-          .eq('user_id', user.id);
-      }
+      console.log(`📊 ANÁLISE: Encontrados ${items?.length || 0} lançamentos diretos`);
+      console.log(`📊 ANÁLISE: Tipos encontrados:`, items?.map(item => ({
+        type: item.type,
+        amount: item.amount,
+        description: item.description.substring(0, 30)
+      })));
       
-      const { data: summaries, error: summariesError } = await summariesQuery;
-      if (summariesError) throw summariesError;
+      // Verificar se há entradas
+      const entradas = items?.filter(item => item.type === 'entrada') || [];
+      const saidas = items?.filter(item => item.type === 'saida') || [];
       
-      // Buscar resumos de receitas do período
-      let incomeSummariesQuery;
-      if (periodType === 'year') {
-        incomeSummariesQuery = supabase
-          .from('financial_summary_income')
-          .select('*')
-          .gte('month', `${selectedMonth.getFullYear()}-01-01`)
-          .lte('month', `${selectedMonth.getFullYear()}-12-01`)
-          .eq('user_id', user.id);
-      } else {
-        const monthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-01`;
-        incomeSummariesQuery = supabase
-          .from('financial_summary_income')
-          .select('*')
-          .eq('month', monthStr)
-          .eq('user_id', user.id);
-      }
+      console.log(`📊 ANÁLISE: ${entradas.length} entradas, ${saidas.length} saídas`);
+      console.log(`📊 ANÁLISE: Total entradas: R$ ${entradas.reduce((sum, item) => sum + Number(item.amount || 0), 0)}`);
+      console.log(`📊 ANÁLISE: Total saídas: R$ ${saidas.reduce((sum, item) => sum + Number(item.amount || 0), 0)}`);
       
-      const { data: incomeSummaries, error: incomeSummariesError } = await incomeSummariesQuery;
-      if (incomeSummariesError) throw incomeSummariesError;
-      
-      // Converter resumos para formato de item e combinar
-      const summaryItems = summaries?.map(summaryToItem) || [];
-      const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
-      const combined = [...(items || []), ...summaryItems, ...incomeSummaryItems];
-      
-      console.log(`Dados do período: ${items?.length || 0} lançamentos + ${summaries?.length || 0} gastos + ${incomeSummaries?.length || 0} receitas = ${combined.length} total`);
-      
-      return combined;
+      return items || [];
     },
     enabled: !!user,
     refetchOnWindowFocus: true,
     staleTime: 0
   });
 
-  // Dados históricos completos para tendência - desde o primeiro registro
+  // Dados históricos completos para tendência - INCLUINDO resumos mensais
   const { data: trendData = [], refetch: refetchTrend } = useQuery({
     queryKey: ['trend-analysis', user?.id],
     queryFn: async () => {
       if (!user) return [];
+      
+      console.log(`🔍 TENDÊNCIA: Buscando dados históricos para usuário: ${user.id}`);
       
       // Buscar TODOS os lançamentos detalhados do usuário
       const { data: items, error } = await supabase
@@ -185,7 +155,7 @@ const Analise = () => {
       const incomeSummaryItems = incomeSummaries?.map(incomeSummaryToItem) || [];
       const combined = [...(items || []), ...summaryItems, ...incomeSummaryItems];
       
-      console.log(`Dados históricos completos: ${items?.length || 0} lançamentos + ${summaries?.length || 0} gastos + ${incomeSummaries?.length || 0} receitas = ${combined.length} total`);
+      console.log(`📊 TENDÊNCIA: ${items?.length || 0} lançamentos + ${summaries?.length || 0} gastos + ${incomeSummaries?.length || 0} receitas = ${combined.length} total`);
       
       return combined;
     },
@@ -261,6 +231,8 @@ const Analise = () => {
       .reduce((sum, item) => sum + Number(item.amount || 0), 0);
     
     const profit = revenue - expenses;
+    
+    console.log(`💰 RESUMO PERÍODO: Receitas=${revenue}, Despesas=${expenses}, Lucro=${profit}`);
     
     return { revenue, expenses, profit };
   };
