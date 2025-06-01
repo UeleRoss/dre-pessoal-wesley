@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentBrazilDate } from "@/utils/dateUtils";
+import { Pencil } from "lucide-react";
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -26,22 +27,28 @@ interface Category {
 
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
-// Categorias padrão que servem como base
-const INITIAL_CATEGORIES = [
-  "Carro",
-  "Comida", 
-  "Contas Mensais",
-  "Entre bancos",
+// Categorias específicas por tipo
+const SAIDA_CATEGORIES = [
+  "Apartamento",
   "Escritório",
+  "Contas mensais",
   "Estudos",
-  "Go On Outdoor",
-  "Imposto",
-  "Investimentos",
   "Lazer e ócio",
-  "Pro-Labore",
+  "Comida",
+  "Tráfego Pago",
   "Vida esportiva",
-  "Anúncios Online",
+  "Go On Outdoor",
+  "Carro",
   "Itens Físicos"
+];
+
+const ENTRADA_CATEGORIES = [
+  "Go On Outdoor",
+  "Global Vita",
+  "Hotmart Go On",
+  "Produto Online",
+  "Stripe/assinaturas",
+  "Outras receitas"
 ];
 
 const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
@@ -51,37 +58,94 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     description: '',
     category: '',
     bank: '',
-    date: getCurrentBrazilDate(), // Usar data atual do Brasil
+    date: getCurrentBrazilDate(),
   });
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Buscar todas as categorias (padrão + personalizadas)
-  const { data: allCategories = [], isLoading: isLoadingCategories } = useQuery({
-    queryKey: ['all-categories'],
+  // Buscar categorias personalizadas do usuário
+  const { data: customCategories = [] } = useQuery({
+    queryKey: ['custom-categories', formData.type],
     queryFn: async () => {
+      if (!formData.type) return [];
+      
       const { data, error } = await supabase
         .from('categories')
         .select('*')
         .order('name');
       
       if (error) throw error;
+      return data as Category[];
+    },
+    enabled: !!formData.type
+  });
+
+  // Combinar categorias padrão com personalizadas baseado no tipo
+  const getAvailableCategories = () => {
+    if (!formData.type) return [];
+    
+    const defaultCategories = formData.type === 'saida' ? SAIDA_CATEGORIES : ENTRADA_CATEGORIES;
+    const customCategoryNames = customCategories.map(cat => cat.name);
+    
+    // Filtrar categorias personalizadas que se aplicam ao tipo atual
+    const relevantCustomCategories = customCategories.filter(cat => {
+      // Adicionar lógica se quiser categorizar as personalizadas por tipo
+      return true; // Por enquanto, mostrar todas as personalizadas
+    });
+    
+    const allCategories = [
+      ...defaultCategories.map(name => ({
+        id: `default-${name}`,
+        name,
+        is_default: true
+      })),
+      ...relevantCustomCategories
+    ];
+    
+    return allCategories;
+  };
+
+  // Criar nova categoria
+  const createCategoryMutation = useMutation({
+    mutationFn: async (categoryName: string) => {
+      const { data: session } = await supabase.auth.getSession();
+      const user = session?.session?.user;
+
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([{
+          name: categoryName,
+          user_id: user.id
+        }])
+        .select()
+        .single();
       
-      // Combinar categorias padrão com personalizadas
-      const customCategories = data as Category[];
-      const existingNames = customCategories.map(cat => cat.name);
-      
-      // Adicionar categorias padrão que não existem ainda
-      const defaultCategoriesToAdd = INITIAL_CATEGORIES
-        .filter(name => !existingNames.includes(name))
-        .map(name => ({
-          id: `default-${name}`,
-          name,
-          user_id: 'default',
-          is_default: true
-        }));
-      
-      return [...defaultCategoriesToAdd, ...customCategories];
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (newCategory) => {
+      toast({
+        title: "Categoria criada",
+        description: `Categoria "${newCategory.name}" adicionada com sucesso!`,
+      });
+      setFormData({ ...formData, category: newCategory.name });
+      setNewCategoryName('');
+      setShowNewCategoryInput(false);
+      queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar categoria.",
+        variant: "destructive",
+      });
     }
   });
 
@@ -126,6 +190,12 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     createMutation.mutate(formData);
   };
 
+  const handleCreateNewCategory = () => {
+    if (newCategoryName.trim()) {
+      createCategoryMutation.mutate(newCategoryName.trim());
+    }
+  };
+
   // Reset form quando o modal abrir
   useEffect(() => {
     if (isOpen) {
@@ -135,10 +205,21 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         description: '',
         category: '',
         bank: '',
-        date: getCurrentBrazilDate(), // Sempre usar data atual do Brasil
+        date: getCurrentBrazilDate(),
       });
+      setShowNewCategoryInput(false);
+      setNewCategoryName('');
     }
   }, [isOpen]);
+
+  // Reset categoria quando mudar o tipo
+  useEffect(() => {
+    if (formData.type) {
+      setFormData(prev => ({ ...prev, category: '' }));
+    }
+  }, [formData.type]);
+
+  const availableCategories = getAvailableCategories();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -189,17 +270,50 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           </div>
 
           <div>
-            <Label htmlFor="category">Categoria</Label>
+            <div className="flex items-center gap-2 mb-2">
+              <Label htmlFor="category">Categoria</Label>
+              {formData.type && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNewCategoryInput(!showNewCategoryInput)}
+                  className="h-6 w-6 p-0"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            
+            {showNewCategoryInput && (
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="Nome da nova categoria"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleCreateNewCategory()}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCreateNewCategory}
+                  disabled={!newCategoryName.trim()}
+                >
+                  Criar
+                </Button>
+              </div>
+            )}
+            
             <Select
               value={formData.category}
               onValueChange={(value) => setFormData({ ...formData, category: value })}
-              disabled={isLoadingCategories}
+              disabled={!formData.type}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>
               <SelectContent>
-                {allCategories?.map((category: Category) => (
+                {availableCategories.map((category) => (
                   <SelectItem key={category.id} value={category.name}>
                     {category.name}
                   </SelectItem>
