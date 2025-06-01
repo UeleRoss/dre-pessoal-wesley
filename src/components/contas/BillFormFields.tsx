@@ -12,13 +12,17 @@ interface BillFormFieldsProps {
 }
 
 export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps) => {
+  // Garantir que os valores dos selects sejam sempre strings válidas
+  const safeCategory = formData.category && CATEGORIES.includes(formData.category) ? formData.category : "";
+  const safeBank = formData.bank && BANKS.includes(formData.bank) ? formData.bank : "";
+
   return (
     <>
       <div>
         <Label htmlFor="name">Nome da Conta</Label>
         <Input
           id="name"
-          value={formData.name}
+          value={formData.name || ""}
           onChange={(e) => onInputChange('name', e.target.value)}
           placeholder="Ex: Energia Elétrica"
           required
@@ -31,7 +35,7 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
           id="value"
           type="number"
           step="0.01"
-          value={formData.value}
+          value={formData.value || ""}
           onChange={(e) => onInputChange('value', e.target.value)}
           placeholder="0.00"
           required
@@ -45,7 +49,7 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
           type="number"
           min="1"
           max="31"
-          value={formData.due_date}
+          value={formData.due_date || ""}
           onChange={(e) => onInputChange('due_date', e.target.value)}
           placeholder="Ex: 15"
           required
@@ -55,7 +59,7 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
       <div>
         <Label htmlFor="category">Categoria</Label>
         <Select
-          value={formData.category || undefined}
+          value={safeCategory}
           onValueChange={(value) => onInputChange('category', value || '')}
         >
           <SelectTrigger>
@@ -74,7 +78,7 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
       <div>
         <Label htmlFor="bank">Banco (Opcional)</Label>
         <Select
-          value={formData.bank || undefined}
+          value={safeBank}
           onValueChange={(value) => onInputChange('bank', value || '')}
         >
           <SelectTrigger>
@@ -94,7 +98,7 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
       <div className="flex items-center space-x-2">
         <Switch
           id="recurring"
-          checked={formData.recurring}
+          checked={!!formData.recurring}
           onCheckedChange={(checked) => onInputChange('recurring', checked)}
         />
         <Label htmlFor="recurring">Conta recorrente (todo mês)</Label>

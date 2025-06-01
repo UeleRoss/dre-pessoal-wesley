@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { RecurringBill, BillFormData } from "./types";
-import { BANKS, CATEGORIES } from "./constants";
 
 export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: any) => void) => {
   const { toast } = useToast();
@@ -10,25 +9,16 @@ export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: 
   const [formData, setFormData] = useState<BillFormData>(() => {
     console.log("🔧 BillForm - Inicializando formData");
     
-    // Validar se a categoria existe na lista, senão usar string vazia
-    const categoryValue = editingBill?.category && CATEGORIES.includes(editingBill.category) 
-      ? editingBill.category 
-      : '';
-    
-    // Validar se o banco existe na lista, senão usar string vazia
-    const bankValue = editingBill?.bank && BANKS.includes(editingBill.bank) 
-      ? editingBill.bank 
-      : '';
-    
     const initialData = {
       name: editingBill?.name || '',
       value: editingBill?.value?.toString() || '',
       due_date: editingBill?.due_date?.toString() || '',
-      category: categoryValue,
-      bank: bankValue,
+      category: editingBill?.category || '',
+      bank: editingBill?.bank || '',
       recurring: editingBill?.recurring ?? true
     };
-    console.log("🔧 BillForm - Dados iniciais validados:", initialData);
+    
+    console.log("🔧 BillForm - Dados iniciais:", initialData);
     return initialData;
   });
 
