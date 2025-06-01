@@ -8,9 +8,14 @@ import LancamentosHeader from "@/components/LancamentosHeader";
 import LancamentosFilters from "@/components/LancamentosFilters";
 import FinancialItemsList from "@/components/FinancialItemsList";
 import FinancialSummaryCards from "@/components/FinancialSummaryCards";
+import BankCard from "@/components/BankCard";
+import BankBalanceManager from "@/components/BankBalanceManager";
 import { useFinancialData } from "@/hooks/useFinancialData";
 import { useLancamentosState } from "@/hooks/useLancamentosState";
 import { useFinancialItemActions } from "@/components/FinancialItemActions";
+import { Button } from "@/components/ui/button";
+import { Settings } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 const CATEGORIES = [
@@ -21,6 +26,7 @@ const CATEGORIES = [
 
 const Lancamentos = () => {
   const [user, setUser] = useState<any>(null);
+  const [showBankSetup, setShowBankSetup] = useState(false);
 
   const {
     searchTerm,
@@ -69,6 +75,41 @@ const Lancamentos = () => {
     selectedItems
   });
 
+  // Buscar saldos iniciais dos bancos
+  const { data: bankBalances = [] } = useQuery({
+    queryKey: ['bank-balances'],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('bank_balances')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user
+  });
+
+  // Buscar todos os bancos únicos que o usuário possui
+  const { data: availableBanks = [] } = useQuery({
+    queryKey: ['available-banks', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const uniqueBanks = [...new Set(data.map(item => item.bank))];
+      return uniqueBanks;
+    },
+    enabled: !!user?.id
+  });
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -81,7 +122,41 @@ const Lancamentos = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Calcular saldos atuais dos bancos considerando apenas lançamentos após configuração
+  const calculateBankBalances = () => {
+    return availableBanks.map(bank => {
+      // Saldo inicial configurado
+      const bankConfig = bankBalances.find(b => b.bank_name === bank);
+      const initialBalance = bankConfig?.initial_balance || 0;
+      
+      // Data de configuração do saldo (usar updated_at como referência)
+      const configDate = bankConfig?.updated_at;
+      
+      // Movimentações deste banco no período, considerando apenas após a configuração
+      let bankItems = financialItems.filter(item => item.bank === bank);
+      
+      // Se há data de configuração, filtrar apenas lançamentos posteriores
+      if (configDate) {
+        bankItems = bankItems.filter(item => item.created_at > configDate);
+      }
+      
+      const periodMovement = bankItems.reduce((sum, item) => {
+        return item.type === 'entrada' ? sum + item.amount : sum - item.amount;
+      }, 0);
+      
+      // Saldo atual = saldo inicial + movimentações após configuração
+      const currentBalance = initialBalance + periodMovement;
+      
+      return {
+        name: bank,
+        balance: currentBalance,
+        previousBalance: initialBalance
+      };
+    });
+  };
+
   const filteredItems = getFilteredItems(financialItems);
+  const calculatedBankBalances = calculateBankBalances();
 
   if (!user) {
     return <Auth onAuthChange={setUser} />;
@@ -98,6 +173,64 @@ const Lancamentos = () => {
       />
 
       <FinancialSummaryCards items={financialItems} />
+
+      {/* Bank Balances Section */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-navy-800">Saldos por Banco</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowBankSetup(true)}
+            className="text-xs"
+          >
+            <Settings className="h-3 w-3 mr-1" />
+            Setup
+          </Button>
+        </div>
+        
+        {calculatedBankBalances.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {calculatedBankBalances.map((bank) => (
+              <BankCard
+                key={bank.name}
+                name={bank.name}
+                balance={bank.balance}
+                previousBalance={bank.previousBalance}
+                className="text-xs"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-gray-500 text-sm">
+            <p>Configure os saldos iniciais dos bancos para visualizar o resumo</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBankSetup(true)}
+              className="mt-2"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar Saldos
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Bank Setup Modal */}
+      {showBankSetup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Setup de Saldos dos Bancos</h2>
+                <Button variant="ghost" onClick={() => setShowBankSetup(false)}>×</Button>
+              </div>
+              <BankBalanceManager />
+            </div>
+          </div>
+        </div>
+      )}
 
       <LancamentosFilters
         searchTerm={searchTerm}
