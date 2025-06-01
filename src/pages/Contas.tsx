@@ -7,6 +7,7 @@ import NewBillButton from "@/components/contas/NewBillButton";
 import EditBillModal from "@/components/contas/EditBillModal";
 import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
 import CreditCardChargesSection from "@/components/contas/CreditCardChargesSection";
+import MonthSelector from "@/components/contas/MonthSelector";
 import { useContasLogic } from "@/hooks/useContasLogic";
 import { useState } from "react";
 
@@ -22,6 +23,8 @@ interface RecurringBill {
 }
 
 const Contas = () => {
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  
   const {
     user,
     setUser,
@@ -103,6 +106,11 @@ const Contas = () => {
         
         <NewBillButton onSubmit={handleNewBillSubmit} />
       </div>
+
+      <MonthSelector 
+        selectedMonth={selectedMonth}
+        onMonthChange={setSelectedMonth}
+      />
 
       <ContasSummaryCards 
         totals={totals}

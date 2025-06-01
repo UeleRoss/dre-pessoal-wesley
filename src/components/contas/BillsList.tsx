@@ -2,6 +2,7 @@
 import { CheckCircle, XCircle, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,18 +86,14 @@ const BillsList = ({
             return (
               <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onTogglePaid(bill.id, !bill.paid_this_month)}
-                    className="p-1"
-                  >
-                    {bill.paid_this_month ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-600" />
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={bill.paid_this_month}
+                      onCheckedChange={(checked) => onTogglePaid(bill.id, checked as boolean)}
+                      className="h-5 w-5"
+                    />
+                    <span className="text-sm text-gray-600">Paga</span>
+                  </div>
                   
                   <div>
                     <h3 className={`font-medium ${bill.paid_this_month ? 'line-through text-gray-500' : ''}`}>
