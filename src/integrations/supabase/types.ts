@@ -36,6 +36,36 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_adjustments: {
+        Row: {
+          adjusted_value: number
+          bill_id: string
+          created_at: string
+          id: string
+          month: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adjusted_value: number
+          bill_id: string
+          created_at?: string
+          id?: string
+          month: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adjusted_value?: number
+          bill_id?: string
+          created_at?: string
+          id?: string
+          month?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
