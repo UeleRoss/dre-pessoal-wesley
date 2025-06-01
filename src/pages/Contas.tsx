@@ -6,6 +6,7 @@ import BankBalancesCard from "@/components/contas/BankBalancesCard";
 import NewBillButton from "@/components/contas/NewBillButton";
 import EditBillModal from "@/components/contas/EditBillModal";
 import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
+import CreditCardChargesSection from "@/components/contas/CreditCardChargesSection";
 import { useContasLogic } from "@/hooks/useContasLogic";
 import { useState } from "react";
 
@@ -124,6 +125,9 @@ const Contas = () => {
         currentBalances={currentBalances}
         bills={bills}
       />
+
+      {/* Nova seção para cobranças do cartão de crédito */}
+      <CreditCardChargesSection />
 
       <EditBillModal
         editingBill={editingBill}

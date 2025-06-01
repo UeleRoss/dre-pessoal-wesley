@@ -90,6 +90,48 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_card_charges: {
+        Row: {
+          ativo: boolean
+          card: string
+          created_at: string
+          description: string
+          id: string
+          observacao: string | null
+          parcelas: number | null
+          type: string
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          ativo?: boolean
+          card: string
+          created_at?: string
+          description: string
+          id?: string
+          observacao?: string | null
+          parcelas?: number | null
+          type: string
+          updated_at?: string
+          user_id?: string
+          value: number
+        }
+        Update: {
+          ativo?: boolean
+          card?: string
+          created_at?: string
+          description?: string
+          id?: string
+          observacao?: string | null
+          parcelas?: number | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
       financial_items: {
         Row: {
           amount: number
