@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import BillForm from "./BillForm";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface NewBillButtonProps {
   onSubmit: (formData: any) => void;
@@ -55,11 +56,13 @@ const NewBillButton = ({ onSubmit }: NewBillButtonProps) => {
             Debug: Modal está aberto = {isOpen.toString()}
           </div>
           
-          <BillForm
-            editingBill={null}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-          />
+          <ErrorBoundary fallback={<div className="text-red-500">Erro ao carregar formulário</div>}>
+            <BillForm
+              editingBill={null}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+            />
+          </ErrorBoundary>
         </DialogContent>
       </Dialog>
     </>
