@@ -3,19 +3,27 @@ import Auth from "@/components/Auth";
 import ContasSummaryCards from "@/components/contas/ContasSummaryCards";
 import BillsList from "@/components/contas/BillsList";
 import BankBalancesCard from "@/components/contas/BankBalancesCard";
-import ContasModalHandlers from "@/components/contas/ContasModalHandlers";
+import NewBillButton from "@/components/contas/NewBillButton";
+import EditBillModal from "@/components/contas/EditBillModal";
+import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
 import { useContasLogic } from "@/hooks/useContasLogic";
+import { useState } from "react";
+
+interface RecurringBill {
+  id: string;
+  name: string;
+  value: number;
+  due_date: number;
+  category: string;
+  bank: string;
+  recurring: boolean;
+  paid_this_month: boolean;
+}
 
 const Contas = () => {
   const {
     user,
     setUser,
-    showNewBillModal,
-    setShowNewBillModal,
-    editingBill,
-    setEditingBill,
-    editingAdjustment,
-    setEditingAdjustment,
     bills,
     billAdjustments,
     createBillMutation,
@@ -27,44 +35,50 @@ const Contas = () => {
     calculateTotals
   } = useContasLogic();
 
-  const handleSubmit = (formData: any) => {
-    console.log("handleSubmit chamado com:", formData);
-    console.log("editingBill:", editingBill);
-    
+  const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
+  const [editingAdjustment, setEditingAdjustment] = useState<{billId: string, currentValue: number} | null>(null);
+
+  console.log("🔧 Contas página renderizada");
+
+  const handleNewBillSubmit = (formData: any) => {
+    console.log("🔧 Contas - handleNewBillSubmit:", formData);
+    createBillMutation.mutate(formData);
+  };
+
+  const handleEditBillSubmit = (formData: any) => {
+    console.log("🔧 Contas - handleEditBillSubmit:", formData);
     if (editingBill) {
-      console.log("Atualizando conta existente");
       updateBillMutation.mutate({
         id: editingBill.id,
         data: {
           ...formData,
           value: parseFloat(formData.value),
           due_date: parseInt(formData.due_date),
-          bank: formData.bank || '' // Permite banco vazio
+          bank: formData.bank || ''
         }
       });
-      setEditingBill(null);
-      setShowNewBillModal(false);
-    } else {
-      console.log("Criando nova conta");
-      createBillMutation.mutate(formData);
     }
   };
 
-  const handleEdit = (bill: any) => {
-    console.log("Editando conta:", bill);
+  const handleEdit = (bill: RecurringBill) => {
+    console.log("🔧 Contas - handleEdit:", bill);
     setEditingBill(bill);
-    setShowNewBillModal(true);
+  };
+
+  const handleCloseEdit = () => {
+    console.log("🔧 Contas - handleCloseEdit");
+    setEditingBill(null);
   };
 
   const handleAdjustValue = (billId: string, currentValue: number) => {
-    console.log("Ajustando valor para conta:", billId, currentValue);
+    console.log("🔧 Contas - handleAdjustValue:", billId, currentValue);
     setEditingAdjustment({ billId, currentValue });
   };
 
   const submitAdjustment = (value: number) => {
     if (!editingAdjustment) return;
     
-    console.log("Submetendo ajuste:", editingAdjustment, value);
+    console.log("🔧 Contas - submitAdjustment:", editingAdjustment, value);
     adjustBillMutation.mutate({
       billId: editingAdjustment.billId,
       value: value
@@ -78,8 +92,6 @@ const Contas = () => {
   const totals = calculateTotals();
   const currentBalances = calculateCurrentBalances();
 
-  console.log("*** Renderizando Contas - showNewBillModal:", showNewBillModal);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -88,17 +100,7 @@ const Contas = () => {
           <p className="text-navy-600 mt-1">Gerencie suas contas fixas e previsão de caixa</p>
         </div>
         
-        <ContasModalHandlers
-          showNewBillModal={showNewBillModal}
-          setShowNewBillModal={setShowNewBillModal}
-          editingBill={editingBill}
-          setEditingBill={setEditingBill}
-          editingAdjustment={editingAdjustment}
-          setEditingAdjustment={setEditingAdjustment}
-          onSubmit={handleSubmit}
-          onAdjustValue={handleAdjustValue}
-          submitAdjustment={submitAdjustment}
-        />
+        <NewBillButton onSubmit={handleNewBillSubmit} />
       </div>
 
       <ContasSummaryCards 
@@ -121,6 +123,20 @@ const Contas = () => {
       <BankBalancesCard
         currentBalances={currentBalances}
         bills={bills}
+      />
+
+      <EditBillModal
+        editingBill={editingBill}
+        isOpen={!!editingBill}
+        onClose={handleCloseEdit}
+        onSubmit={handleEditBillSubmit}
+      />
+
+      <ValueAdjustmentModal
+        isOpen={!!editingAdjustment}
+        onClose={() => setEditingAdjustment(null)}
+        onSubmit={submitAdjustment}
+        currentValue={editingAdjustment?.currentValue || 0}
       />
     </div>
   );
