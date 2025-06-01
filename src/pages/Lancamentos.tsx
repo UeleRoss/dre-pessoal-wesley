@@ -7,6 +7,7 @@ import EditEntryModal from "@/components/EditEntryModal";
 import LancamentosHeader from "@/components/LancamentosHeader";
 import LancamentosFilters from "@/components/LancamentosFilters";
 import FinancialItemsList from "@/components/FinancialItemsList";
+import FinancialSummaryCards from "@/components/FinancialSummaryCards";
 import { useFinancialData } from "@/hooks/useFinancialData";
 import { useLancamentosState } from "@/hooks/useLancamentosState";
 import { useFinancialItemActions } from "@/components/FinancialItemActions";
@@ -95,6 +96,8 @@ const Lancamentos = () => {
         periodType={periodType}
         onPeriodTypeChange={setPeriodType}
       />
+
+      <FinancialSummaryCards items={financialItems} />
 
       <LancamentosFilters
         searchTerm={searchTerm}
