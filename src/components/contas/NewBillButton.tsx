@@ -12,49 +12,40 @@ interface NewBillButtonProps {
 const NewBillButton = ({ onSubmit }: NewBillButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  console.log("🔧 NewBillButton - isOpen:", isOpen);
+  console.log("🔧 NewBillButton - renderizando, isOpen:", isOpen);
 
-  const handleOpenChange = (open: boolean) => {
-    console.log("🔧 NewBillButton - handleOpenChange:", open);
-    setIsOpen(open);
-  };
-
-  const handleFormSubmit = (formData: any) => {
-    console.log("🔧 NewBillButton - handleFormSubmit:", formData);
+  const handleSubmit = (formData: any) => {
+    console.log("🔧 NewBillButton - handleSubmit chamado:", formData);
     onSubmit(formData);
     setIsOpen(false);
   };
 
-  const handleFormCancel = () => {
-    console.log("🔧 NewBillButton - handleFormCancel");
+  const handleCancel = () => {
+    console.log("🔧 NewBillButton - handleCancel chamado");
     setIsOpen(false);
   };
 
-  const handleButtonClick = () => {
-    console.log("🔧 NewBillButton - button clicked");
-    setIsOpen(true);
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button onClick={handleButtonClick} type="button">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Conta
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Nova Conta Recorrente</DialogTitle>
-        </DialogHeader>
-        
-        <BillForm
-          editingBill={null}
-          onSubmit={handleFormSubmit}
-          onCancel={handleFormCancel}
-        />
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button onClick={() => setIsOpen(true)} type="button">
+        <Plus className="h-4 w-4 mr-2" />
+        Nova Conta
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Conta Recorrente</DialogTitle>
+          </DialogHeader>
+          
+          <BillForm
+            editingBill={null}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

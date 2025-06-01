@@ -40,7 +40,7 @@ interface BillFormProps {
 }
 
 const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
-  console.log("BillForm renderizado com editingBill:", editingBill);
+  console.log("🔧 BillForm - renderizando com editingBill:", editingBill);
   
   const [formData, setFormData] = useState({
     name: editingBill?.name || '',
@@ -51,23 +51,15 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
     recurring: editingBill?.recurring ?? true
   });
 
-  console.log("Estado inicial do formData:", formData);
-
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log("Tentando submeter form com dados:", formData);
+    console.log("🔧 BillForm - handleSubmit chamado com:", formData);
     
     if (!formData.name || !formData.value || !formData.due_date || !formData.category) {
-      console.log("Erro de validação - campos obrigatórios faltando:", {
-        name: !!formData.name,
-        value: !!formData.value,
-        due_date: !!formData.due_date,
-        category: !!formData.category
-      });
-      
+      console.log("🔧 BillForm - Validação falhou");
       toast({
         title: "Campos obrigatórios",
         description: "Preencha nome, valor, data de vencimento e categoria.",
@@ -76,126 +68,116 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
       return;
     }
 
-    console.log("Validação passou, chamando onSubmit com:", formData);
-    
-    try {
-      onSubmit(formData);
-    } catch (error) {
-      console.error("Erro ao chamar onSubmit:", error);
-      toast({
-        title: "Erro",
-        description: "Erro inesperado ao processar formulário.",
-        variant: "destructive",
-      });
-    }
+    console.log("🔧 BillForm - Validação passou, enviando dados");
+    onSubmit(formData);
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {
-    console.log(`Alterando campo ${field} para:`, value);
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      console.log("Novo estado do formData:", newData);
-      return newData;
-    });
+    console.log(`🔧 BillForm - Alterando ${field} para:`, value);
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  console.log("🔧 BillForm - Renderizando formulário");
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Nome da Conta</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => handleInputChange('name', e.target.value)}
-          placeholder="Ex: Energia Elétrica"
-          required
-        />
-      </div>
+    <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="name">Nome da Conta</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => handleInputChange('name', e.target.value)}
+            placeholder="Ex: Energia Elétrica"
+            required
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="value">Valor</Label>
-        <Input
-          id="value"
-          type="number"
-          step="0.01"
-          value={formData.value}
-          onChange={(e) => handleInputChange('value', e.target.value)}
-          placeholder="0.00"
-          required
-        />
-      </div>
+        <div>
+          <Label htmlFor="value">Valor</Label>
+          <Input
+            id="value"
+            type="number"
+            step="0.01"
+            value={formData.value}
+            onChange={(e) => handleInputChange('value', e.target.value)}
+            placeholder="0.00"
+            required
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="due_date">Dia do Vencimento</Label>
-        <Input
-          id="due_date"
-          type="number"
-          min="1"
-          max="31"
-          value={formData.due_date}
-          onChange={(e) => handleInputChange('due_date', e.target.value)}
-          placeholder="Ex: 15"
-          required
-        />
-      </div>
+        <div>
+          <Label htmlFor="due_date">Dia do Vencimento</Label>
+          <Input
+            id="due_date"
+            type="number"
+            min="1"
+            max="31"
+            value={formData.due_date}
+            onChange={(e) => handleInputChange('due_date', e.target.value)}
+            placeholder="Ex: 15"
+            required
+          />
+        </div>
 
-      <div>
-        <Label htmlFor="category">Categoria</Label>
-        <Select
-          value={formData.category}
-          onValueChange={(value) => handleInputChange('category', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione a categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            {CATEGORIES.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div>
+          <Label htmlFor="category">Categoria</Label>
+          <Select
+            value={formData.category}
+            onValueChange={(value) => handleInputChange('category', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORIES.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <Label htmlFor="bank">Banco (Opcional)</Label>
-        <Select
-          value={formData.bank}
-          onValueChange={(value) => handleInputChange('bank', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o banco (opcional)" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Nenhum banco específico</SelectItem>
-            {BANKS.map((bank) => (
-              <SelectItem key={bank} value={bank}>
-                {bank}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div>
+          <Label htmlFor="bank">Banco (Opcional)</Label>
+          <Select
+            value={formData.bank}
+            onValueChange={(value) => handleInputChange('bank', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o banco (opcional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Nenhum banco específico</SelectItem>
+              {BANKS.map((bank) => (
+                <SelectItem key={bank} value={bank}>
+                  {bank}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="recurring"
-          checked={formData.recurring}
-          onCheckedChange={(checked) => handleInputChange('recurring', checked)}
-        />
-        <Label htmlFor="recurring">Conta recorrente (todo mês)</Label>
-      </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="recurring"
+            checked={formData.recurring}
+            onCheckedChange={(checked) => handleInputChange('recurring', checked)}
+          />
+          <Label htmlFor="recurring">Conta recorrente (todo mês)</Label>
+        </div>
 
-      <div className="flex gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-          Cancelar
-        </Button>
-        <Button type="submit" className="flex-1">
-          {editingBill ? 'Atualizar' : 'Salvar'}
-        </Button>
-      </div>
-    </form>
+        <div className="flex gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+            Cancelar
+          </Button>
+          <Button type="submit" className="flex-1">
+            {editingBill ? 'Atualizar' : 'Salvar'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
 
