@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,9 +20,29 @@ interface NewEntryModalProps {
 interface Category {
   id: string;
   name: string;
+  user_id?: string;
+  is_default?: boolean;
 }
 
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
+
+// Categorias padrão que servem como base
+const INITIAL_CATEGORIES = [
+  "Carro",
+  "Comida", 
+  "Contas Mensais",
+  "Entre bancos",
+  "Escritório",
+  "Estudos",
+  "Go On Outdoor",
+  "Imposto",
+  "Investimentos",
+  "Lazer e ócio",
+  "Pro-Labore",
+  "Vida esportiva",
+  "Anúncios Online",
+  "Itens Físicos"
+];
 
 const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const [formData, setFormData] = useState({
@@ -35,16 +56,32 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
   const { toast } = useToast();
 
-  // Buscar categorias do usuário
-  const { data: categories, isLoading: isLoadingCategories } = useQuery({
-    queryKey: ['categories'],
+  // Buscar todas as categorias (padrão + personalizadas)
+  const { data: allCategories = [], isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['all-categories'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
-        .select('*');
+        .select('*')
+        .order('name');
       
       if (error) throw error;
-      return data;
+      
+      // Combinar categorias padrão com personalizadas
+      const customCategories = data as Category[];
+      const existingNames = customCategories.map(cat => cat.name);
+      
+      // Adicionar categorias padrão que não existem ainda
+      const defaultCategoriesToAdd = INITIAL_CATEGORIES
+        .filter(name => !existingNames.includes(name))
+        .map(name => ({
+          id: `default-${name}`,
+          name,
+          user_id: 'default',
+          is_default: true
+        }));
+      
+      return [...defaultCategoriesToAdd, ...customCategories];
     }
   });
 
@@ -162,7 +199,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>
               <SelectContent>
-                {categories?.map((category: Category) => (
+                {allCategories?.map((category: Category) => (
                   <SelectItem key={category.id} value={category.name}>
                     {category.name}
                   </SelectItem>
