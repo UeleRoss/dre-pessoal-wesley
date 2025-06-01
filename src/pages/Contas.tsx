@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -379,12 +380,41 @@ const Contas = () => {
     setEditingBill(null);
   };
 
+  const handleNewBillClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("*** Botão Nova Conta clicado - Event:", e.type);
+    console.log("*** Estado atual showNewBillModal:", showNewBillModal);
+    console.log("*** editingBill:", editingBill);
+    
+    resetForm();
+    setShowNewBillModal(true);
+    
+    console.log("*** Após setState - showNewBillModal deveria ser true");
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    console.log("*** Dialog onOpenChange chamado com:", open);
+    console.log("*** Estado anterior showNewBillModal:", showNewBillModal);
+    
+    setShowNewBillModal(open);
+    
+    if (!open) {
+      console.log("*** Fechando dialog - resetando form");
+      resetForm();
+    }
+    
+    console.log("*** Após setShowNewBillModal:", open);
+  };
+
   if (!user) {
     return <Auth onAuthChange={setUser} />;
   }
 
   const totals = calculateTotals();
   const currentBalances = calculateCurrentBalances();
+
+  console.log("*** Renderizando Contas - showNewBillModal:", showNewBillModal);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -394,16 +424,9 @@ const Contas = () => {
           <p className="text-navy-600 mt-1">Gerencie suas contas fixas e previsão de caixa</p>
         </div>
         
-        <Dialog open={showNewBillModal} onOpenChange={(open) => {
-          console.log("Dialog onOpenChange:", open);
-          setShowNewBillModal(open);
-        }}>
+        <Dialog open={showNewBillModal} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
-            <Button onClick={() => {
-              console.log("Botão Nova Conta clicado");
-              resetForm();
-              setShowNewBillModal(true);
-            }}>
+            <Button onClick={handleNewBillClick} type="button">
               <Plus className="h-4 w-4 mr-2" />
               Nova Conta
             </Button>
@@ -417,7 +440,7 @@ const Contas = () => {
               editingBill={editingBill}
               onSubmit={handleSubmit}
               onCancel={() => {
-                console.log("Cancelando formulário");
+                console.log("*** BillForm onCancel chamado");
                 setShowNewBillModal(false);
               }}
             />
