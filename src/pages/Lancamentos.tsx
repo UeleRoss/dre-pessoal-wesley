@@ -91,21 +91,30 @@ const Lancamentos = () => {
     enabled: !!user
   });
 
-  // Buscar todos os bancos únicos que o usuário possui
+  // Buscar todos os bancos únicos que o usuário possui OU que foram configurados
   const { data: availableBanks = [] } = useQuery({
-    queryKey: ['available-banks', user?.id],
+    queryKey: ['available-banks', user?.id, bankBalances],
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const { data, error } = await supabase
+      // Buscar bancos dos lançamentos existentes
+      const { data: itemsBanks, error } = await supabase
         .from('financial_items')
         .select('bank')
         .eq('user_id', user.id);
       
       if (error) throw error;
       
-      const uniqueBanks = [...new Set(data.map(item => item.bank))];
-      return uniqueBanks;
+      const banksFromItems = [...new Set(itemsBanks.map(item => item.bank))];
+      const banksFromBalances = bankBalances.map(balance => balance.bank_name);
+      
+      // Combinar bancos dos lançamentos e bancos configurados
+      const allBanks = [...new Set([...banksFromItems, ...banksFromBalances])];
+      
+      console.log("Bancos disponíveis:", allBanks);
+      console.log("Bancos dos saldos:", banksFromBalances);
+      
+      return allBanks;
     },
     enabled: !!user?.id
   });
@@ -146,6 +155,13 @@ const Lancamentos = () => {
       
       // Saldo atual = saldo inicial + movimentações após configuração
       const currentBalance = initialBalance + periodMovement;
+      
+      console.log(`Banco ${bank}:`, {
+        initialBalance,
+        periodMovement,
+        currentBalance,
+        configDate
+      });
       
       return {
         name: bank,
@@ -190,14 +206,14 @@ const Lancamentos = () => {
         </div>
         
         {calculatedBankBalances.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
             {calculatedBankBalances.map((bank) => (
               <BankCard
                 key={bank.name}
                 name={bank.name}
                 balance={bank.balance}
                 previousBalance={bank.previousBalance}
-                className="text-xs"
+                className="text-xs p-3"
               />
             ))}
           </div>
