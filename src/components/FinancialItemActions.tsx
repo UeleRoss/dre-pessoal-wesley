@@ -38,9 +38,13 @@ export const useFinancialItemActions = ({
   };
 
   const handleDeleteSelected = () => {
-    console.log("Deletando itens selecionados:", selectedItems.length, "itens");
+    console.log("🗑️ Iniciando deleção de itens selecionados:", selectedItems.length, "itens");
     if (selectedItems.length > 0) {
-      deleteMultipleMutation.mutate(selectedItems);
+      deleteMultipleMutation.mutate(selectedItems, {
+        onSuccess: () => {
+          setSelectedItems([]);
+        }
+      });
     } else {
       toast({
         title: "Aviso",
@@ -51,6 +55,7 @@ export const useFinancialItemActions = ({
   };
 
   const handleDelete = (id: string) => {
+    console.log("🗑️ Iniciando deleção de item individual:", id);
     deleteMutation.mutate(id);
   };
 
