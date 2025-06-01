@@ -25,18 +25,35 @@ const NewBillButton = ({ onSubmit }: NewBillButtonProps) => {
     setIsOpen(false);
   };
 
+  const handleOpenChange = (open: boolean) => {
+    console.log("🔧 NewBillButton - Dialog onOpenChange:", open);
+    setIsOpen(open);
+  };
+
+  console.log("🔧 NewBillButton - Renderizando JSX, isOpen:", isOpen);
+
   return (
     <>
-      <Button onClick={() => setIsOpen(true)} type="button">
+      <Button 
+        onClick={() => {
+          console.log("🔧 NewBillButton - Botão clicado, abrindo modal");
+          setIsOpen(true);
+        }} 
+        type="button"
+      >
         <Plus className="h-4 w-4 mr-2" />
         Nova Conta
       </Button>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nova Conta Recorrente</DialogTitle>
           </DialogHeader>
+          
+          <div className="text-xs text-blue-500 mb-2">
+            Debug: Modal está aberto = {isOpen.toString()}
+          </div>
           
           <BillForm
             editingBill={null}

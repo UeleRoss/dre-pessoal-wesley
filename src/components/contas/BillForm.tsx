@@ -40,22 +40,27 @@ interface BillFormProps {
 }
 
 const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
-  console.log("🔧 BillForm - renderizando com editingBill:", editingBill);
+  console.log("🔧 BillForm - INICIANDO RENDERIZAÇÃO");
+  console.log("🔧 BillForm - editingBill:", editingBill);
   
-  const [formData, setFormData] = useState({
-    name: editingBill?.name || '',
-    value: editingBill?.value?.toString() || '',
-    due_date: editingBill?.due_date?.toString() || '',
-    category: editingBill?.category || '',
-    bank: editingBill?.bank || '',
-    recurring: editingBill?.recurring ?? true
+  const { toast } = useToast();
+  
+  const [formData, setFormData] = useState(() => {
+    console.log("🔧 BillForm - Inicializando formData");
+    return {
+      name: editingBill?.name || '',
+      value: editingBill?.value?.toString() || '',
+      due_date: editingBill?.due_date?.toString() || '',
+      category: editingBill?.category || '',
+      bank: editingBill?.bank || '',
+      recurring: editingBill?.recurring ?? true
+    };
   });
 
-  const { toast } = useToast();
+  console.log("🔧 BillForm - formData inicial:", formData);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     console.log("🔧 BillForm - handleSubmit chamado com:", formData);
     
     if (!formData.name || !formData.value || !formData.due_date || !formData.category) {
@@ -68,7 +73,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
       return;
     }
 
-    console.log("🔧 BillForm - Validação passou, enviando dados");
+    console.log("🔧 BillForm - Enviando dados para onSubmit");
     onSubmit(formData);
   };
 
@@ -77,10 +82,14 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  console.log("🔧 BillForm - Renderizando formulário");
+  console.log("🔧 BillForm - Renderizando JSX");
 
   return (
     <div className="space-y-4">
+      <div className="text-sm text-gray-500">
+        BillForm carregado com sucesso
+      </div>
+      
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="name">Nome da Conta</Label>
