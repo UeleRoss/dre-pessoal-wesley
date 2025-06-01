@@ -5,7 +5,6 @@ import Layout from './components/Layout';
 import Index from './pages/Index';
 import Dashboard from './pages/Dashboard';
 import Lancamentos from './pages/Lancamentos';
-import Analise from './pages/Analise';
 import Contas from './pages/Contas';
 import Investimentos from './pages/Investimentos';
 import NotFound from './pages/NotFound';
@@ -23,7 +22,6 @@ function App() {
             <Route index element={<Index />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="lancamentos" element={<Lancamentos />} />
-            <Route path="analise" element={<Analise />} />
             <Route path="contas" element={<Contas />} />
             <Route path="investimentos" element={<Investimentos />} />
             <Route path="*" element={<NotFound />} />

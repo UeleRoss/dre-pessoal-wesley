@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Receipt, 
-  BarChart3, 
   CreditCard,
   TrendingUp,
   PiggyBank
@@ -13,7 +12,6 @@ import {
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Lançamentos", href: "/lancamentos", icon: Receipt },
-  { name: "Análise", href: "/analise", icon: BarChart3 },
   { name: "Contas", href: "/contas", icon: CreditCard },
   { name: "Investimentos", href: "/investimentos", icon: PiggyBank },
 ];
