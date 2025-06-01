@@ -130,8 +130,8 @@ const BillsList = ({
             
             return (
               <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Checkbox
                       checked={bill.paid_this_month}
                       onCheckedChange={(checked) => onTogglePaid(bill.id, checked as boolean)}
@@ -140,17 +140,17 @@ const BillsList = ({
                     <span className="text-sm text-gray-600">Paga</span>
                   </div>
                   
-                  <div>
-                    <h3 className={`font-medium ${bill.paid_this_month ? 'line-through text-gray-500' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`font-medium text-left ${bill.paid_this_month ? 'line-through text-gray-500' : ''}`}>
                       {bill.name}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 text-left">
                       Vencimento: dia {bill.due_date} • {bill.category} • {bill.bank}
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-shrink-0">
                   <div className="text-right">
                     <div className="flex items-center gap-2">
                       <p className={`font-bold ${bill.paid_this_month ? 'text-gray-500' : 'text-red-600'}`}>
