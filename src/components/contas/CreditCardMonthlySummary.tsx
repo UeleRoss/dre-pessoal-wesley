@@ -31,42 +31,22 @@ const CreditCardMonthlySummary = ({ charges, selectedMonth }: CreditCardMonthlyS
     charges
       .filter(charge => charge.ativo)
       .forEach(charge => {
-        const chargeDate = new Date(charge.created_at);
         let monthlyValue = 0;
         
-        console.log(`🔧 Processando cobrança: ${charge.description} - Tipo: ${charge.type}`);
+        console.log(`🔧 Processando cobrança: ${charge.description} - Tipo: ${charge.type} - Valor: R$ ${charge.value}`);
         
         if (charge.type === 'recorrente') {
-          // Para recorrentes, sempre incluir o valor total no mês selecionado
+          // Para recorrentes, usar o valor diretamente
           monthlyValue = charge.value;
           console.log(`🔧 Recorrente: ${charge.description} = R$ ${monthlyValue}`);
-        } else if (charge.type === 'parcelado' && charge.parcelas) {
-          // Para parceladas, calcular se a parcela do mês selecionado existe
-          const chargeStart = new Date(chargeDate.getFullYear(), chargeDate.getMonth(), 1);
-          const selectedStart = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
-          
-          // Calcular diferença em meses desde o início da cobrança
-          const monthsDiff = (selectedStart.getFullYear() - chargeStart.getFullYear()) * 12 + 
-                            (selectedStart.getMonth() - chargeStart.getMonth());
-          
-          // Se está dentro do período de parcelas (0 = primeiro mês, 1 = segundo mês, etc)
-          if (monthsDiff >= 0 && monthsDiff < charge.parcelas) {
-            monthlyValue = charge.value / charge.parcelas;
-            console.log(`🔧 Parcelado: ${charge.description} - Parcela ${monthsDiff + 1}/${charge.parcelas} = R$ ${monthlyValue} (Valor total: R$ ${charge.value})`);
-          } else {
-            console.log(`🔧 Parcelado: ${charge.description} - Fora do período (mês ${monthsDiff + 1} de ${charge.parcelas})`);
-          }
+        } else if (charge.type === 'parcelado') {
+          // Para parceladas, o valor já representa a parcela do mês - não dividir
+          monthlyValue = charge.value;
+          console.log(`🔧 Parcelado: ${charge.description} = R$ ${monthlyValue} (valor já é da parcela)`);
         } else if (charge.type === 'avulso') {
-          // Para avulso, incluir apenas se for do mesmo mês da criação
-          const chargeMonth = format(chargeDate, "yyyy-MM");
-          const selectedMonthStr = format(selectedMonth, "yyyy-MM");
-          
-          if (chargeMonth === selectedMonthStr) {
-            monthlyValue = charge.value;
-            console.log(`🔧 Avulso: ${charge.description} = R$ ${monthlyValue}`);
-          } else {
-            console.log(`🔧 Avulso: ${charge.description} - Não é do mês selecionado`);
-          }
+          // Para avulso, usar o valor diretamente
+          monthlyValue = charge.value;
+          console.log(`🔧 Avulso: ${charge.description} = R$ ${monthlyValue}`);
         }
         
         if (monthlyValue > 0) {
