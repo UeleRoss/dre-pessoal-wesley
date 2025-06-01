@@ -54,10 +54,10 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.value || !formData.due_date || !formData.category || !formData.bank) {
+    if (!formData.name || !formData.value || !formData.due_date || !formData.category) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos.",
+        description: "Preencha nome, valor, data de vencimento e categoria.",
         variant: "destructive",
       });
       return;
@@ -126,15 +126,16 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
       </div>
 
       <div>
-        <Label htmlFor="bank">Banco</Label>
+        <Label htmlFor="bank">Banco (Opcional)</Label>
         <Select
           value={formData.bank}
           onValueChange={(value) => setFormData({ ...formData, bank: value })}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Selecione o banco" />
+            <SelectValue placeholder="Selecione o banco (opcional)" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="">Nenhum banco específico</SelectItem>
             {BANKS.map((bank) => (
               <SelectItem key={bank} value={bank}>
                 {bank}

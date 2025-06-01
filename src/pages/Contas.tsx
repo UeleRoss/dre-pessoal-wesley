@@ -143,6 +143,7 @@ const Contas = () => {
           ...data,
           value: parseFloat(data.value),
           due_date: parseInt(data.due_date),
+          bank: data.bank || '', // Permite banco vazio
           user_id: user.id
         }]);
       
@@ -170,7 +171,10 @@ const Contas = () => {
     mutationFn: async ({ id, data }: { id: string; data: Partial<RecurringBill> }) => {
       const { error } = await supabase
         .from('recurring_bills')
-        .update(data)
+        .update({
+          ...data,
+          bank: data.bank || '' // Permite banco vazio na atualização
+        })
         .eq('id', id);
       
       if (error) throw error;
@@ -271,7 +275,8 @@ const Contas = () => {
         data: {
           ...formData,
           value: parseFloat(formData.value),
-          due_date: parseInt(formData.due_date)
+          due_date: parseInt(formData.due_date),
+          bank: formData.bank || '' // Permite banco vazio
         }
       });
       setEditingBill(null);
