@@ -79,13 +79,14 @@ const Contas = () => {
     setEditingAdjustment({ billId, currentValue });
   };
 
-  const submitAdjustment = (value: number) => {
+  const submitAdjustment = (value: number, month: string) => {
     if (!editingAdjustment) return;
     
-    console.log("🔧 Contas - submitAdjustment:", editingAdjustment, value);
+    console.log("🔧 Contas - submitAdjustment:", editingAdjustment, value, month);
     adjustBillMutation.mutate({
       billId: editingAdjustment.billId,
-      value: value
+      value: value,
+      month: month
     });
   };
 
@@ -149,6 +150,7 @@ const Contas = () => {
         onClose={() => setEditingAdjustment(null)}
         onSubmit={submitAdjustment}
         currentValue={editingAdjustment?.currentValue || 0}
+        selectedMonth={selectedMonth}
       />
     </div>
   );

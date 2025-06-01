@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -213,26 +214,26 @@ export const useContasLogic = () => {
   });
 
   const adjustBillMutation = useMutation({
-    mutationFn: async ({ billId, value }: { billId: string; value: number }) => {
+    mutationFn: async ({ billId, value, month }: { billId: string; value: number; month: string }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
       
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      console.log("💾 Salvando ajuste:", { billId, value, month, user_id: user.id });
       
       const { error } = await supabase
         .from('bill_adjustments')
         .upsert([{
           bill_id: billId,
-          month: currentMonth,
+          month: month,
           adjusted_value: value,
           user_id: user.id
         }]);
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, { month }) => {
       toast({
         title: "Valor ajustado",
-        description: "Valor da conta ajustado para este mês!",
+        description: `Valor da conta ajustado para ${month}!`,
       });
       setEditingAdjustment(null);
       queryClient.invalidateQueries({ queryKey: ['bill-adjustments'] });
