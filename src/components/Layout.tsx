@@ -1,8 +1,6 @@
-
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
-  LayoutDashboard, 
   Receipt, 
   CreditCard,
   TrendingUp,
@@ -10,7 +8,6 @@ import {
 } from "lucide-react";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Lançamentos", href: "/lancamentos", icon: Receipt },
   { name: "Contas", href: "/contas", icon: CreditCard },
   { name: "Investimentos", href: "/investimentos", icon: PiggyBank },

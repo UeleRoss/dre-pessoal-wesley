@@ -14,6 +14,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import BillsListHeader from "./BillsListHeader";
+import { useState } from "react";
 
 interface RecurringBill {
   id: string;
@@ -51,10 +53,42 @@ const BillsList = ({
   onDelete, 
   onAdjustValue 
 }: BillsListProps) => {
+  const [sortField, setSortField] = useState<'due_date' | 'value' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   const getCurrentBillValue = (bill: RecurringBill) => {
     const adjustment = billAdjustments.find(adj => adj.bill_id === bill.id);
     return adjustment ? adjustment.adjusted_value : bill.value;
   };
+
+  const handleSort = (field: 'due_date' | 'value') => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedBills = [...bills].sort((a, b) => {
+    if (!sortField) return 0;
+    
+    let valueA, valueB;
+    
+    if (sortField === 'due_date') {
+      valueA = a.due_date;
+      valueB = b.due_date;
+    } else {
+      valueA = getCurrentBillValue(a);
+      valueB = getCurrentBillValue(b);
+    }
+    
+    if (sortDirection === 'asc') {
+      return valueA - valueB;
+    } else {
+      return valueB - valueA;
+    }
+  });
 
   if (bills.length === 0) {
     return (
@@ -77,9 +111,14 @@ const BillsList = ({
       <CardHeader>
         <CardTitle>Contas do Mês</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {bills.map((bill) => {
+      <CardContent className="p-0">
+        <BillsListHeader
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+        />
+        <div className="space-y-3 p-4">
+          {sortedBills.map((bill) => {
             const currentValue = getCurrentBillValue(bill);
             const hasAdjustment = billAdjustments.some(adj => adj.bill_id === bill.id);
             
