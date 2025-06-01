@@ -9,12 +9,16 @@ export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: 
   const [formData, setFormData] = useState<BillFormData>(() => {
     console.log("🔧 BillForm - Inicializando formData");
     
+    // Convert empty bank to "NONE" for proper Select handling
+    const bankValue = editingBill?.bank || "";
+    const safeBankValue = bankValue === "" ? "NONE" : bankValue;
+    
     const initialData = {
       name: editingBill?.name || '',
       value: editingBill?.value?.toString() || '',
       due_date: editingBill?.due_date?.toString() || '',
       category: editingBill?.category || '',
-      bank: editingBill?.bank || '',
+      bank: safeBankValue,
       recurring: editingBill?.recurring ?? true
     };
     
@@ -36,8 +40,14 @@ export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: 
       return;
     }
 
-    console.log("🔧 BillForm - Enviando dados para onSubmit");
-    onSubmit(formData);
+    // Convert "NONE" back to empty string for submission
+    const submitData = {
+      ...formData,
+      bank: formData.bank === "NONE" ? "" : formData.bank
+    };
+
+    console.log("🔧 BillForm - Enviando dados para onSubmit:", submitData);
+    onSubmit(submitData);
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {

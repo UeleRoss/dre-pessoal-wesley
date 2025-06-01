@@ -12,9 +12,9 @@ interface BillFormFieldsProps {
 }
 
 export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps) => {
-  // Garantir que os valores dos selects sejam sempre strings válidas
-  const safeCategory = formData.category && CATEGORIES.includes(formData.category) ? formData.category : "";
-  const safeBank = formData.bank && BANKS.includes(formData.bank) ? formData.bank : "";
+  // Use safe values for selects - never empty strings
+  const safeCategory = formData.category && CATEGORIES.includes(formData.category) ? formData.category : undefined;
+  const safeBank = formData.bank === "NONE" || (formData.bank && BANKS.includes(formData.bank)) ? formData.bank : undefined;
 
   return (
     <>
@@ -79,13 +79,13 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
         <Label htmlFor="bank">Banco (Opcional)</Label>
         <Select
           value={safeBank}
-          onValueChange={(value) => onInputChange('bank', value || '')}
+          onValueChange={(value) => onInputChange('bank', value === "NONE" ? "" : value || '')}
         >
           <SelectTrigger>
             <SelectValue placeholder="Selecione o banco (opcional)" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Nenhum banco específico</SelectItem>
+            <SelectItem value="NONE">Nenhum banco específico</SelectItem>
             {BANKS.map((bank) => (
               <SelectItem key={bank} value={bank}>
                 {bank}
