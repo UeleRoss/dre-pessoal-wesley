@@ -9,9 +9,9 @@ export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: 
   const [formData, setFormData] = useState<BillFormData>(() => {
     console.log("🔧 BillForm - Inicializando formData");
     
-    // Convert empty bank to "NONE" for proper Select handling
+    // Convert empty bank or "SEM_BANCO" to "NONE" for proper Select handling
     const bankValue = editingBill?.bank || "";
-    const safeBankValue = bankValue === "" ? "NONE" : bankValue;
+    const safeBankValue = (bankValue === "" || bankValue === "SEM_BANCO") ? "NONE" : bankValue;
     
     const initialData = {
       name: editingBill?.name || '',
@@ -40,11 +40,10 @@ export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: 
       return;
     }
 
-    // Convert "NONE" to a valid bank name that will pass the constraint
-    // Use the first bank from our list as default when no bank is selected
+    // Convert "NONE" to "SEM_BANCO" - a special value indicating no specific bank
     const submitData = {
       ...formData,
-      bank: formData.bank === "NONE" ? "CONTA SIMPLES" : formData.bank
+      bank: formData.bank === "NONE" ? "SEM_BANCO" : formData.bank
     };
 
     console.log("🔧 BillForm - Enviando dados para onSubmit:", submitData);
