@@ -250,16 +250,37 @@ export const useContasLogic = (selectedMonth: Date) => {
       
       console.log("💾 Salvando ajuste mensal:", { billId, value, month: currentMonthKey, user_id: user.id });
       
-      const { error } = await supabase
+      // Primeiro, verificar se já existe uma instância para este mês
+      const { data: existingInstance } = await supabase
         .from('recurring_bills_instances')
-        .upsert([{
-          bill_id: billId,
-          month_reference: currentMonthKey,
-          valor_ajustado: value,
-          user_id: user.id
-        }]);
-      
-      if (error) throw error;
+        .select('*')
+        .eq('bill_id', billId)
+        .eq('month_reference', currentMonthKey)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingInstance) {
+        // Se existe, apenas atualizar o valor_ajustado
+        const { error } = await supabase
+          .from('recurring_bills_instances')
+          .update({ valor_ajustado: value })
+          .eq('id', existingInstance.id);
+        
+        if (error) throw error;
+      } else {
+        // Se não existe, criar nova instância com valor_ajustado
+        const { error } = await supabase
+          .from('recurring_bills_instances')
+          .insert({
+            bill_id: billId,
+            month_reference: currentMonthKey,
+            valor_ajustado: value,
+            pago: false, // sempre iniciar como não pago
+            user_id: user.id
+          });
+        
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       toast({
@@ -269,7 +290,8 @@ export const useContasLogic = (selectedMonth: Date) => {
       setEditingAdjustment(null);
       queryClient.invalidateQueries({ queryKey: ['bill-instances'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("💥 Erro ao ajustar valor:", error);
       toast({
         title: "Erro",
         description: "Erro ao ajustar valor da conta.",
@@ -309,19 +331,48 @@ export const useContasLogic = (selectedMonth: Date) => {
       
       console.log("💾 Salvando status de pagamento:", { billId: id, paid, month: currentMonthKey });
       
-      const { error } = await supabase
+      // Primeiro, verificar se já existe uma instância para este mês
+      const { data: existingInstance } = await supabase
         .from('recurring_bills_instances')
-        .upsert([{
-          bill_id: id,
-          month_reference: currentMonthKey,
-          pago: paid,
-          user_id: user.id
-        }]);
-      
-      if (error) throw error;
+        .select('*')
+        .eq('bill_id', id)
+        .eq('month_reference', currentMonthKey)
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingInstance) {
+        // Se existe, apenas atualizar o status pago
+        const { error } = await supabase
+          .from('recurring_bills_instances')
+          .update({ pago: paid })
+          .eq('id', existingInstance.id);
+        
+        if (error) throw error;
+      } else {
+        // Se não existe, criar nova instância com status pago
+        const { error } = await supabase
+          .from('recurring_bills_instances')
+          .insert({
+            bill_id: id,
+            month_reference: currentMonthKey,
+            pago: paid,
+            valor_ajustado: null, // sem valor ajustado inicialmente
+            user_id: user.id
+          });
+        
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bill-instances'] });
+    },
+    onError: (error) => {
+      console.error("💥 Erro ao alterar status de pagamento:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar status de pagamento.",
+        variant: "destructive",
+      });
     }
   });
 
