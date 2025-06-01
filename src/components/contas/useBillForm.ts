@@ -40,10 +40,11 @@ export const useBillForm = (editingBill: RecurringBill | null, onSubmit: (data: 
       return;
     }
 
-    // Convert "NONE" back to empty string for submission
+    // Convert "NONE" to a valid bank name that will pass the constraint
+    // Use the first bank from our list as default when no bank is selected
     const submitData = {
       ...formData,
-      bank: formData.bank === "NONE" ? "" : formData.bank
+      bank: formData.bank === "NONE" ? "CONTA SIMPLES" : formData.bank
     };
 
     console.log("🔧 BillForm - Enviando dados para onSubmit:", submitData);

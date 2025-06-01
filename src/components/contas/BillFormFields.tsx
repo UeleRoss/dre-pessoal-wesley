@@ -76,16 +76,16 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
       </div>
 
       <div>
-        <Label htmlFor="bank">Banco (Opcional)</Label>
+        <Label htmlFor="bank">Banco</Label>
         <Select
           value={safeBank}
-          onValueChange={(value) => onInputChange('bank', value === "NONE" ? "" : value || '')}
+          onValueChange={(value) => onInputChange('bank', value || 'NONE')}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Selecione o banco (opcional)" />
+            <SelectValue placeholder="Selecione o banco" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="NONE">Nenhum banco específico</SelectItem>
+            <SelectItem value="NONE">Sem banco específico (usar padrão)</SelectItem>
             {BANKS.map((bank) => (
               <SelectItem key={bank} value={bank}>
                 {bank}
