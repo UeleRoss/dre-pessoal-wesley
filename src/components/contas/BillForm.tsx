@@ -52,8 +52,8 @@ const BillFormContent = ({ editingBill, onSubmit, onCancel }: BillFormProps) => 
       name: editingBill?.name || '',
       value: editingBill?.value?.toString() || '',
       due_date: editingBill?.due_date?.toString() || '',
-      category: editingBill?.category || '', // Deixa vazio para forçar seleção
-      bank: editingBill?.bank || '', // Deixa vazio por ser opcional
+      category: editingBill?.category || '',
+      bank: editingBill?.bank || '',
       recurring: editingBill?.recurring ?? true
     };
     console.log("🔧 BillForm - Dados iniciais:", initialData);
@@ -90,13 +90,6 @@ const BillFormContent = ({ editingBill, onSubmit, onCancel }: BillFormProps) => 
   try {
     return (
       <div className="space-y-4">
-        <div className="text-sm text-gray-500">
-          BillForm carregado com sucesso - Debug: {JSON.stringify({ 
-            category: formData.category, 
-            bank: formData.bank 
-          })}
-        </div>
-        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="name">Nome da Conta</Label>
@@ -159,24 +152,22 @@ const BillFormContent = ({ editingBill, onSubmit, onCancel }: BillFormProps) => 
 
           <div>
             <Label htmlFor="bank">Banco (Opcional)</Label>
-            <ErrorBoundary fallback={<div className="text-red-500">Erro no Select de Banco</div>}>
-              <Select
-                value={formData.bank || undefined}
-                onValueChange={(value) => handleInputChange('bank', value || '')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o banco (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Nenhum banco específico</SelectItem>
-                  {BANKS.map((bank) => (
-                    <SelectItem key={bank} value={bank}>
-                      {bank}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </ErrorBoundary>
+            <Select
+              value={formData.bank || ""}
+              onValueChange={(value) => handleInputChange('bank', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o banco (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Nenhum banco específico</SelectItem>
+                {BANKS.map((bank) => (
+                  <SelectItem key={bank} value={bank}>
+                    {bank}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center space-x-2">
