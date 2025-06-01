@@ -377,6 +377,39 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_bills_instances: {
+        Row: {
+          bill_id: string
+          created_at: string
+          id: string
+          month_reference: string
+          pago: boolean
+          updated_at: string
+          user_id: string
+          valor_ajustado: number | null
+        }
+        Insert: {
+          bill_id: string
+          created_at?: string
+          id?: string
+          month_reference: string
+          pago?: boolean
+          updated_at?: string
+          user_id: string
+          valor_ajustado?: number | null
+        }
+        Update: {
+          bill_id?: string
+          created_at?: string
+          id?: string
+          month_reference?: string
+          pago?: boolean
+          updated_at?: string
+          user_id?: string
+          valor_ajustado?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

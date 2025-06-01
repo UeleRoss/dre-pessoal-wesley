@@ -37,12 +37,12 @@ const Contas = () => {
     togglePaidMutation,
     calculateCurrentBalances,
     calculateTotals
-  } = useContasLogic();
+  } = useContasLogic(selectedMonth);
 
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
   const [editingAdjustment, setEditingAdjustment] = useState<{billId: string, currentValue: number} | null>(null);
 
-  console.log("🔧 Contas página renderizada");
+  console.log("🔧 Contas página renderizada - Mês selecionado:", selectedMonth.toISOString().slice(0, 7));
 
   const handleNewBillSubmit = (formData: any) => {
     console.log("🔧 Contas - handleNewBillSubmit:", formData);
@@ -79,14 +79,13 @@ const Contas = () => {
     setEditingAdjustment({ billId, currentValue });
   };
 
-  const submitAdjustment = (value: number, month: string) => {
+  const submitAdjustment = (value: number) => {
     if (!editingAdjustment) return;
     
-    console.log("🔧 Contas - submitAdjustment:", editingAdjustment, value, month);
+    console.log("🔧 Contas - submitAdjustment:", editingAdjustment, value);
     adjustBillMutation.mutate({
       billId: editingAdjustment.billId,
-      value: value,
-      month: month
+      value: value
     });
   };
 
@@ -123,7 +122,7 @@ const Contas = () => {
 
       <BillsList
         bills={bills}
-        billAdjustments={billAdjustments}
+        billAdjustments={[]} // Não usado mais, mas mantido para compatibilidade
         onTogglePaid={(billId, paid) => togglePaidMutation.mutate({ id: billId, paid })}
         onEdit={handleEdit}
         onDelete={(billId) => deleteBillMutation.mutate(billId)}

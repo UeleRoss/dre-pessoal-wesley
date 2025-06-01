@@ -57,6 +57,12 @@ const BillsList = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const getCurrentBillValue = (bill: RecurringBill) => {
+    // Se a conta já tem current_value calculado pelo hook, usar esse valor
+    if ('current_value' in bill) {
+      return (bill as any).current_value;
+    }
+    
+    // Fallback para compatibility
     const adjustment = billAdjustments.find(adj => adj.bill_id === bill.id);
     return adjustment ? adjustment.adjusted_value : bill.value;
   };
@@ -120,7 +126,7 @@ const BillsList = ({
         <div className="space-y-3 p-4">
           {sortedBills.map((bill) => {
             const currentValue = getCurrentBillValue(bill);
-            const hasAdjustment = billAdjustments.some(adj => adj.bill_id === bill.id);
+            const hasAdjustment = (bill as any).current_value !== bill.value;
             
             return (
               <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg">
