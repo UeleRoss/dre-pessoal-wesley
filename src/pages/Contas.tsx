@@ -1,291 +1,31 @@
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 import Auth from "@/components/Auth";
 import ContasSummaryCards from "@/components/contas/ContasSummaryCards";
-import BillForm from "@/components/contas/BillForm";
 import BillsList from "@/components/contas/BillsList";
 import BankBalancesCard from "@/components/contas/BankBalancesCard";
-import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
-
-const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
-
-interface RecurringBill {
-  id: string;
-  name: string;
-  value: number;
-  due_date: number;
-  category: string;
-  bank: string;
-  recurring: boolean;
-  paid_this_month: boolean;
-}
-
-interface BillAdjustment {
-  id: string;
-  bill_id: string;
-  month: string;
-  adjusted_value: number;
-  user_id: string;
-}
+import ContasModalHandlers from "@/components/contas/ContasModalHandlers";
+import { useContasLogic } from "@/hooks/useContasLogic";
 
 const Contas = () => {
-  const [user, setUser] = useState<any>(null);
-  const [showNewBillModal, setShowNewBillModal] = useState(false);
-  const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
-  const [editingAdjustment, setEditingAdjustment] = useState<{billId: string, currentValue: number} | null>(null);
-
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      console.log("Usuário autenticado:", session?.user ?? null);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      console.log("Mudança de auth:", session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Buscar contas cadastradas
-  const { data: bills = [] } = useQuery({
-    queryKey: ['recurring-bills', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('recurring_bills')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('due_date');
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id
-  });
-
-  // Buscar ajustes mensais
-  const { data: billAdjustments = [] } = useQuery({
-    queryKey: ['bill-adjustments', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-      
-      const { data, error } = await supabase
-        .from('bill_adjustments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('month', currentMonth);
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id
-  });
-
-  // Buscar saldos dos bancos
-  const { data: bankBalances = [] } = useQuery({
-    queryKey: ['bank-balances'],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('bank_balances')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id
-  });
-
-  // Buscar lançamentos do mês atual para calcular saldo atualizado
-  const { data: monthlyItems = [] } = useQuery({
-    queryKey: ['monthly-items-contas', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      const { data, error } = await supabase
-        .from('financial_items')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id
-  });
-
-  const createBillMutation = useMutation({
-    mutationFn: async (data: any) => {
-      console.log("Tentando criar conta com dados:", data);
-      console.log("Usuário atual:", user);
-      
-      if (!user?.id) {
-        console.error("Usuário não autenticado");
-        throw new Error('Usuário não autenticado');
-      }
-
-      const billData = {
-        ...data,
-        value: parseFloat(data.value),
-        due_date: parseInt(data.due_date),
-        bank: data.bank || '', // Permite banco vazio
-        user_id: user.id
-      };
-      
-      console.log("Dados processados para inserção:", billData);
-
-      const { error } = await supabase
-        .from('recurring_bills')
-        .insert([billData]);
-      
-      if (error) {
-        console.error("Erro do Supabase:", error);
-        throw error;
-      }
-      
-      console.log("Conta criada com sucesso");
-    },
-    onSuccess: () => {
-      console.log("Sucesso na criação da conta");
-      toast({
-        title: "Conta cadastrada",
-        description: "Conta adicionada com sucesso!",
-      });
-      setShowNewBillModal(false);
-      setEditingBill(null);
-      queryClient.invalidateQueries({ queryKey: ['recurring-bills'] });
-    },
-    onError: (error) => {
-      console.error("Erro na mutation:", error);
-      toast({
-        title: "Erro",
-        description: `Erro ao cadastrar conta: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
-
-  const updateBillMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<RecurringBill> }) => {
-      const { error } = await supabase
-        .from('recurring_bills')
-        .update({
-          ...data,
-          bank: data.bank || '' // Permite banco vazio na atualização
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Conta atualizada",
-        description: "Alterações salvas com sucesso!",
-      });
-      queryClient.invalidateQueries({ queryKey: ['recurring-bills'] });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar conta.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const adjustBillMutation = useMutation({
-    mutationFn: async ({ billId, value }: { billId: string; value: number }) => {
-      if (!user?.id) throw new Error('Usuário não autenticado');
-      
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-      
-      const { error } = await supabase
-        .from('bill_adjustments')
-        .upsert([{
-          bill_id: billId,
-          month: currentMonth,
-          adjusted_value: value,
-          user_id: user.id
-        }]);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Valor ajustado",
-        description: "Valor da conta ajustado para este mês!",
-      });
-      setEditingAdjustment(null);
-      queryClient.invalidateQueries({ queryKey: ['bill-adjustments'] });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Erro ao ajustar valor da conta.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const deleteBillMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('recurring_bills')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Conta excluída",
-        description: "Conta removida com sucesso!",
-      });
-      queryClient.invalidateQueries({ queryKey: ['recurring-bills'] });
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir conta.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const togglePaidMutation = useMutation({
-    mutationFn: async ({ id, paid }: { id: string; paid: boolean }) => {
-      const { error } = await supabase
-        .from('recurring_bills')
-        .update({ paid_this_month: paid })
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring-bills'] });
-    }
-  });
+  const {
+    user,
+    setUser,
+    showNewBillModal,
+    setShowNewBillModal,
+    editingBill,
+    setEditingBill,
+    editingAdjustment,
+    setEditingAdjustment,
+    bills,
+    billAdjustments,
+    createBillMutation,
+    updateBillMutation,
+    adjustBillMutation,
+    deleteBillMutation,
+    togglePaidMutation,
+    calculateCurrentBalances,
+    calculateTotals
+  } = useContasLogic();
 
   const handleSubmit = (formData: any) => {
     console.log("handleSubmit chamado com:", formData);
@@ -310,7 +50,7 @@ const Contas = () => {
     }
   };
 
-  const handleEdit = (bill: RecurringBill) => {
+  const handleEdit = (bill: any) => {
     console.log("Editando conta:", bill);
     setEditingBill(bill);
     setShowNewBillModal(true);
@@ -331,82 +71,6 @@ const Contas = () => {
     });
   };
 
-  // Função para obter o valor atual da conta (considerando ajustes)
-  const getCurrentBillValue = (bill: RecurringBill) => {
-    const adjustment = billAdjustments.find(adj => adj.bill_id === bill.id);
-    return adjustment ? adjustment.adjusted_value : bill.value;
-  };
-
-  // Calcular saldos atuais dos bancos
-  const calculateCurrentBalances = () => {
-    const balances: Record<string, number> = {};
-    
-    BANKS.forEach(bank => {
-      const bankConfig = bankBalances.find(b => b.bank_name === bank);
-      const initialBalance = bankConfig?.initial_balance || 0;
-      
-      const bankMovements = monthlyItems
-        .filter(item => item.bank === bank)
-        .reduce((sum, item) => {
-          return item.type === 'entrada' ? sum + Number(item.amount) : sum - Number(item.amount);
-        }, 0);
-      
-      balances[bank] = initialBalance + bankMovements;
-    });
-    
-    return balances;
-  };
-
-  // Calcular totais
-  const calculateTotals = () => {
-    const totalBills = bills.reduce((sum, bill) => sum + getCurrentBillValue(bill), 0);
-    const paidBills = bills.filter(bill => bill.paid_this_month).reduce((sum, bill) => sum + getCurrentBillValue(bill), 0);
-    const unpaidBills = totalBills - paidBills;
-    
-    const currentBalances = calculateCurrentBalances();
-    const totalCash = Object.values(currentBalances).reduce((sum, balance) => sum + balance, 0);
-    
-    return {
-      totalBills,
-      paidBills,
-      unpaidBills,
-      totalCash,
-      remainingCash: totalCash - unpaidBills
-    };
-  };
-
-  const resetForm = () => {
-    console.log("Resetando formulário");
-    setEditingBill(null);
-  };
-
-  const handleNewBillClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("*** Botão Nova Conta clicado - Event:", e.type);
-    console.log("*** Estado atual showNewBillModal:", showNewBillModal);
-    console.log("*** editingBill:", editingBill);
-    
-    resetForm();
-    setShowNewBillModal(true);
-    
-    console.log("*** Após setState - showNewBillModal deveria ser true");
-  };
-
-  const handleDialogChange = (open: boolean) => {
-    console.log("*** Dialog onOpenChange chamado com:", open);
-    console.log("*** Estado anterior showNewBillModal:", showNewBillModal);
-    
-    setShowNewBillModal(open);
-    
-    if (!open) {
-      console.log("*** Fechando dialog - resetando form");
-      resetForm();
-    }
-    
-    console.log("*** Após setShowNewBillModal:", open);
-  };
-
   if (!user) {
     return <Auth onAuthChange={setUser} />;
   }
@@ -424,28 +88,17 @@ const Contas = () => {
           <p className="text-navy-600 mt-1">Gerencie suas contas fixas e previsão de caixa</p>
         </div>
         
-        <Dialog open={showNewBillModal} onOpenChange={handleDialogChange}>
-          <DialogTrigger asChild>
-            <Button onClick={handleNewBillClick} type="button">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Conta
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingBill ? 'Editar Conta' : 'Nova Conta Recorrente'}</DialogTitle>
-            </DialogHeader>
-            
-            <BillForm
-              editingBill={editingBill}
-              onSubmit={handleSubmit}
-              onCancel={() => {
-                console.log("*** BillForm onCancel chamado");
-                setShowNewBillModal(false);
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        <ContasModalHandlers
+          showNewBillModal={showNewBillModal}
+          setShowNewBillModal={setShowNewBillModal}
+          editingBill={editingBill}
+          setEditingBill={setEditingBill}
+          editingAdjustment={editingAdjustment}
+          setEditingAdjustment={setEditingAdjustment}
+          onSubmit={handleSubmit}
+          onAdjustValue={handleAdjustValue}
+          submitAdjustment={submitAdjustment}
+        />
       </div>
 
       <ContasSummaryCards 
@@ -463,13 +116,6 @@ const Contas = () => {
         onEdit={handleEdit}
         onDelete={(billId) => deleteBillMutation.mutate(billId)}
         onAdjustValue={handleAdjustValue}
-      />
-
-      <ValueAdjustmentModal
-        isOpen={!!editingAdjustment}
-        onClose={() => setEditingAdjustment(null)}
-        onSubmit={submitAdjustment}
-        currentValue={editingAdjustment?.currentValue || 0}
       />
 
       <BankBalancesCard
