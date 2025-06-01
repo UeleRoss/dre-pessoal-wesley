@@ -40,6 +40,8 @@ interface BillFormProps {
 }
 
 const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
+  console.log("BillForm renderizado com editingBill:", editingBill);
+  
   const [formData, setFormData] = useState({
     name: editingBill?.name || '',
     value: editingBill?.value?.toString() || '',
@@ -49,12 +51,23 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
     recurring: editingBill?.recurring ?? true
   });
 
+  console.log("Estado inicial do formData:", formData);
+
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log("Tentando submeter form com dados:", formData);
+    
     if (!formData.name || !formData.value || !formData.due_date || !formData.category) {
+      console.log("Erro de validação - campos obrigatórios faltando:", {
+        name: !!formData.name,
+        value: !!formData.value,
+        due_date: !!formData.due_date,
+        category: !!formData.category
+      });
+      
       toast({
         title: "Campos obrigatórios",
         description: "Preencha nome, valor, data de vencimento e categoria.",
@@ -63,7 +76,27 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
       return;
     }
 
-    onSubmit(formData);
+    console.log("Validação passou, chamando onSubmit com:", formData);
+    
+    try {
+      onSubmit(formData);
+    } catch (error) {
+      console.error("Erro ao chamar onSubmit:", error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao processar formulário.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    console.log(`Alterando campo ${field} para:`, value);
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      console.log("Novo estado do formData:", newData);
+      return newData;
+    });
   };
 
   return (
@@ -73,7 +106,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
         <Input
           id="name"
           value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          onChange={(e) => handleInputChange('name', e.target.value)}
           placeholder="Ex: Energia Elétrica"
           required
         />
@@ -86,7 +119,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
           type="number"
           step="0.01"
           value={formData.value}
-          onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+          onChange={(e) => handleInputChange('value', e.target.value)}
           placeholder="0.00"
           required
         />
@@ -100,7 +133,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
           min="1"
           max="31"
           value={formData.due_date}
-          onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+          onChange={(e) => handleInputChange('due_date', e.target.value)}
           placeholder="Ex: 15"
           required
         />
@@ -110,7 +143,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
         <Label htmlFor="category">Categoria</Label>
         <Select
           value={formData.category}
-          onValueChange={(value) => setFormData({ ...formData, category: value })}
+          onValueChange={(value) => handleInputChange('category', value)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Selecione a categoria" />
@@ -129,7 +162,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
         <Label htmlFor="bank">Banco (Opcional)</Label>
         <Select
           value={formData.bank}
-          onValueChange={(value) => setFormData({ ...formData, bank: value })}
+          onValueChange={(value) => handleInputChange('bank', value)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Selecione o banco (opcional)" />
@@ -149,7 +182,7 @@ const BillForm = ({ editingBill, onSubmit, onCancel }: BillFormProps) => {
         <Switch
           id="recurring"
           checked={formData.recurring}
-          onCheckedChange={(checked) => setFormData({ ...formData, recurring: checked })}
+          onCheckedChange={(checked) => handleInputChange('recurring', checked)}
         />
         <Label htmlFor="recurring">Conta recorrente (todo mês)</Label>
       </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -46,10 +45,12 @@ const Contas = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      console.log("Usuário autenticado:", session?.user ?? null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      console.log("Mudança de auth:", session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
@@ -135,21 +136,37 @@ const Contas = () => {
 
   const createBillMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!user?.id) throw new Error('Usuário não autenticado');
+      console.log("Tentando criar conta com dados:", data);
+      console.log("Usuário atual:", user);
+      
+      if (!user?.id) {
+        console.error("Usuário não autenticado");
+        throw new Error('Usuário não autenticado');
+      }
+
+      const billData = {
+        ...data,
+        value: parseFloat(data.value),
+        due_date: parseInt(data.due_date),
+        bank: data.bank || '', // Permite banco vazio
+        user_id: user.id
+      };
+      
+      console.log("Dados processados para inserção:", billData);
 
       const { error } = await supabase
         .from('recurring_bills')
-        .insert([{
-          ...data,
-          value: parseFloat(data.value),
-          due_date: parseInt(data.due_date),
-          bank: data.bank || '', // Permite banco vazio
-          user_id: user.id
-        }]);
+        .insert([billData]);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro do Supabase:", error);
+        throw error;
+      }
+      
+      console.log("Conta criada com sucesso");
     },
     onSuccess: () => {
+      console.log("Sucesso na criação da conta");
       toast({
         title: "Conta cadastrada",
         description: "Conta adicionada com sucesso!",
@@ -158,10 +175,11 @@ const Contas = () => {
       setEditingBill(null);
       queryClient.invalidateQueries({ queryKey: ['recurring-bills'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Erro na mutation:", error);
       toast({
         title: "Erro",
-        description: "Erro ao cadastrar conta.",
+        description: `Erro ao cadastrar conta: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -269,7 +287,11 @@ const Contas = () => {
   });
 
   const handleSubmit = (formData: any) => {
+    console.log("handleSubmit chamado com:", formData);
+    console.log("editingBill:", editingBill);
+    
     if (editingBill) {
+      console.log("Atualizando conta existente");
       updateBillMutation.mutate({
         id: editingBill.id,
         data: {
@@ -282,22 +304,26 @@ const Contas = () => {
       setEditingBill(null);
       setShowNewBillModal(false);
     } else {
+      console.log("Criando nova conta");
       createBillMutation.mutate(formData);
     }
   };
 
   const handleEdit = (bill: RecurringBill) => {
+    console.log("Editando conta:", bill);
     setEditingBill(bill);
     setShowNewBillModal(true);
   };
 
   const handleAdjustValue = (billId: string, currentValue: number) => {
+    console.log("Ajustando valor para conta:", billId, currentValue);
     setEditingAdjustment({ billId, currentValue });
   };
 
   const submitAdjustment = (value: number) => {
     if (!editingAdjustment) return;
     
+    console.log("Submetendo ajuste:", editingAdjustment, value);
     adjustBillMutation.mutate({
       billId: editingAdjustment.billId,
       value: value
@@ -349,6 +375,7 @@ const Contas = () => {
   };
 
   const resetForm = () => {
+    console.log("Resetando formulário");
     setEditingBill(null);
   };
 
@@ -367,9 +394,16 @@ const Contas = () => {
           <p className="text-navy-600 mt-1">Gerencie suas contas fixas e previsão de caixa</p>
         </div>
         
-        <Dialog open={showNewBillModal} onOpenChange={setShowNewBillModal}>
+        <Dialog open={showNewBillModal} onOpenChange={(open) => {
+          console.log("Dialog onOpenChange:", open);
+          setShowNewBillModal(open);
+        }}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
+            <Button onClick={() => {
+              console.log("Botão Nova Conta clicado");
+              resetForm();
+              setShowNewBillModal(true);
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Conta
             </Button>
@@ -382,7 +416,10 @@ const Contas = () => {
             <BillForm
               editingBill={editingBill}
               onSubmit={handleSubmit}
-              onCancel={() => setShowNewBillModal(false)}
+              onCancel={() => {
+                console.log("Cancelando formulário");
+                setShowNewBillModal(false);
+              }}
             />
           </DialogContent>
         </Dialog>
