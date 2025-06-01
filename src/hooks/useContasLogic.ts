@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,14 +34,15 @@ export const useContasLogic = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    console.log("🔐 Verificando autenticação...");
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      console.log("Usuário autenticado:", session?.user ?? null);
+      console.log("👤 Usuário autenticado:", session?.user?.email || "Nenhum");
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      console.log("Mudança de auth:", session?.user ?? null);
+      console.log("🔄 Mudança de auth:", session?.user?.email || "Nenhum");
     });
 
     return () => subscription.unsubscribe();
@@ -54,13 +54,18 @@ export const useContasLogic = () => {
     queryFn: async () => {
       if (!user?.id) return [];
       
+      console.log("📋 Buscando contas para usuário:", user.id);
       const { data, error } = await supabase
         .from('recurring_bills')
         .select('*')
         .eq('user_id', user.id)
         .order('due_date');
       
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao buscar contas:", error);
+        throw error;
+      }
+      console.log("✅ Contas encontradas:", data?.length || 0);
       return data;
     },
     enabled: !!user?.id
@@ -128,11 +133,11 @@ export const useContasLogic = () => {
 
   const createBillMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log("Tentando criar conta com dados:", data);
-      console.log("Usuário atual:", user);
+      console.log("💾 Iniciando criação de conta:", data);
+      console.log("👤 Usuário atual:", user?.email);
       
       if (!user?.id) {
-        console.error("Usuário não autenticado");
+        console.error("❌ Usuário não autenticado");
         throw new Error('Usuário não autenticado');
       }
 
@@ -140,25 +145,27 @@ export const useContasLogic = () => {
         ...data,
         value: parseFloat(data.value),
         due_date: parseInt(data.due_date),
-        bank: data.bank || '', // Permite banco vazio
+        bank: data.bank || '',
         user_id: user.id
       };
       
-      console.log("Dados processados para inserção:", billData);
+      console.log("📊 Dados processados para inserção:", billData);
 
-      const { error } = await supabase
+      const { data: result, error } = await supabase
         .from('recurring_bills')
-        .insert([billData]);
+        .insert([billData])
+        .select();
       
       if (error) {
-        console.error("Erro do Supabase:", error);
+        console.error("❌ Erro do Supabase:", error);
         throw error;
       }
       
-      console.log("Conta criada com sucesso");
+      console.log("✅ Conta criada com sucesso:", result);
+      return result;
     },
     onSuccess: () => {
-      console.log("Sucesso na criação da conta");
+      console.log("🎉 Sucesso na criação da conta");
       toast({
         title: "Conta cadastrada",
         description: "Conta adicionada com sucesso!",
@@ -168,7 +175,7 @@ export const useContasLogic = () => {
       queryClient.invalidateQueries({ queryKey: ['recurring-bills'] });
     },
     onError: (error) => {
-      console.error("Erro na mutation:", error);
+      console.error("💥 Erro na mutation:", error);
       toast({
         title: "Erro",
         description: `Erro ao cadastrar conta: ${error.message}`,
@@ -183,7 +190,7 @@ export const useContasLogic = () => {
         .from('recurring_bills')
         .update({
           ...data,
-          bank: data.bank || '' // Permite banco vazio na atualização
+          bank: data.bank || ''
         })
         .eq('id', id);
       
@@ -209,7 +216,7 @@ export const useContasLogic = () => {
     mutationFn: async ({ billId, value }: { billId: string; value: number }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
       
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const currentMonth = new Date().toISOString().slice(0, 7);
       
       const { error } = await supabase
         .from('bill_adjustments')

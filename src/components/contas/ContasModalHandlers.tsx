@@ -41,58 +41,82 @@ const ContasModalHandlers = ({
   submitAdjustment
 }: ContasModalHandlersProps) => {
   const resetForm = () => {
-    console.log("Resetando formulário");
+    console.log("🔄 Resetando formulário");
     setEditingBill(null);
   };
 
   const handleNewBillClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("*** Botão Nova Conta clicado - Event:", e.type);
-    console.log("*** Estado atual showNewBillModal:", showNewBillModal);
-    console.log("*** editingBill:", editingBill);
+    console.log("🔥 BOTÃO NOVA CONTA CLICADO");
+    console.log("📊 Estado atual:", {
+      showNewBillModal,
+      editingBill,
+      event: e.type
+    });
     
     resetForm();
     setShowNewBillModal(true);
     
-    console.log("*** Após setState - showNewBillModal deveria ser true");
+    console.log("✅ Após setState - showNewBillModal deveria ser true");
   };
 
   const handleDialogChange = (open: boolean) => {
-    console.log("*** Dialog onOpenChange chamado com:", open);
-    console.log("*** Estado anterior showNewBillModal:", showNewBillModal);
+    console.log("🎯 Dialog onOpenChange:", open);
+    console.log("📋 Estado anterior showNewBillModal:", showNewBillModal);
     
     setShowNewBillModal(open);
     
     if (!open) {
-      console.log("*** Fechando dialog - resetando form");
+      console.log("❌ Fechando dialog - resetando form");
       resetForm();
     }
-    
-    console.log("*** Após setShowNewBillModal:", open);
   };
+
+  const handleFormSubmit = (formData: any) => {
+    console.log("📝 ContasModalHandlers - handleFormSubmit chamado com:", formData);
+    try {
+      onSubmit(formData);
+      console.log("✅ onSubmit executado com sucesso");
+    } catch (error) {
+      console.error("❌ Erro ao executar onSubmit:", error);
+    }
+  };
+
+  const handleFormCancel = () => {
+    console.log("🚫 ContasModalHandlers - handleFormCancel chamado");
+    setShowNewBillModal(false);
+    resetForm();
+  };
+
+  console.log("🎨 ContasModalHandlers renderizando:", {
+    showNewBillModal,
+    editingBill: !!editingBill,
+    editingAdjustment: !!editingAdjustment
+  });
 
   return (
     <>
       <Dialog open={showNewBillModal} onOpenChange={handleDialogChange}>
         <DialogTrigger asChild>
-          <Button onClick={handleNewBillClick} type="button">
+          <Button 
+            onClick={handleNewBillClick} 
+            type="button"
+            className="pointer-events-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nova Conta
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingBill ? 'Editar Conta' : 'Nova Conta Recorrente'}</DialogTitle>
           </DialogHeader>
           
           <BillForm
             editingBill={editingBill}
-            onSubmit={onSubmit}
-            onCancel={() => {
-              console.log("*** BillForm onCancel chamado");
-              setShowNewBillModal(false);
-            }}
+            onSubmit={handleFormSubmit}
+            onCancel={handleFormCancel}
           />
         </DialogContent>
       </Dialog>
