@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -319,6 +318,14 @@ export const useContasLogic = () => {
     const unpaidBills = totalBills - paidBills;
     
     const currentBalances = calculateCurrentBalances();
+    
+    // Considerar apenas C6 BANK, ASAAS e CONTA SIMPLES para o saldo restante
+    const relevantBanks = ['C6 BANK', 'ASAAS', 'CONTA SIMPLES'];
+    const totalCashForBills = relevantBanks.reduce((sum, bank) => {
+      return sum + (currentBalances[bank] || 0);
+    }, 0);
+    
+    // Total geral de todos os bancos para outros cálculos
     const totalCash = Object.values(currentBalances).reduce((sum, balance) => sum + balance, 0);
     
     return {
@@ -326,7 +333,7 @@ export const useContasLogic = () => {
       paidBills,
       unpaidBills,
       totalCash,
-      remainingCash: totalCash - unpaidBills
+      remainingCash: totalCashForBills - unpaidBills
     };
   };
 
