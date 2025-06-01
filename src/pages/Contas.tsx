@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -26,9 +25,17 @@ import {
 
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 const CATEGORIES = [
-  "Carro", "Comida", "Contas Mensais", "Entre bancos", "Escritório", 
-  "Estudos", "Go On Outdoor", "Imposto", "Investimentos", "Lazer e ócio", 
-  "Pro-Labore", "Vida esportiva", "Anúncios Online", "Itens Físicos"
+  "Apartamento",
+  "Escritório", 
+  "Contas mensais",
+  "Estudos",
+  "Lazer e ócio",
+  "Comida",
+  "Tráfego Pago",
+  "Vida esportiva",
+  "Go On Outdoor",
+  "Carro",
+  "Itens Físicos"
 ];
 
 interface RecurringBill {
@@ -42,10 +49,20 @@ interface RecurringBill {
   paid_this_month: boolean;
 }
 
+interface BillAdjustment {
+  id: string;
+  bill_id: string;
+  month: string;
+  adjusted_value: number;
+  user_id: string;
+}
+
 const Contas = () => {
   const [user, setUser] = useState<any>(null);
   const [showNewBillModal, setShowNewBillModal] = useState(false);
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
+  const [editingAdjustment, setEditingAdjustment] = useState<{billId: string, currentValue: number} | null>(null);
+  const [adjustmentValue, setAdjustmentValue] = useState("");
   const [formData, setFormData] = useState({
     name: '',
     value: '',
@@ -81,6 +98,26 @@ const Contas = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('due_date');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  // Buscar ajustes mensais
+  const { data: billAdjustments = [] } = useQuery({
+    queryKey: ['bill-adjustments', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      
+      const { data, error } = await supabase
+        .from('bill_adjustments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('month', currentMonth);
       
       if (error) throw error;
       return data;
@@ -186,6 +223,41 @@ const Contas = () => {
     }
   });
 
+  const adjustBillMutation = useMutation({
+    mutationFn: async ({ billId, value }: { billId: string; value: number }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+      
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      
+      const { error } = await supabase
+        .from('bill_adjustments')
+        .upsert([{
+          bill_id: billId,
+          month: currentMonth,
+          adjusted_value: value,
+          user_id: user.id
+        }]);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Valor ajustado",
+        description: "Valor da conta ajustado para este mês!",
+      });
+      setEditingAdjustment(null);
+      setAdjustmentValue("");
+      queryClient.invalidateQueries({ queryKey: ['bill-adjustments'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao ajustar valor da conta.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const deleteBillMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -277,6 +349,27 @@ const Contas = () => {
       recurring: bill.recurring
     });
     setShowNewBillModal(true);
+  };
+
+  const handleAdjustValue = (billId: string, currentValue: number) => {
+    const adjustment = billAdjustments.find(adj => adj.bill_id === billId);
+    setEditingAdjustment({ billId, currentValue });
+    setAdjustmentValue(adjustment ? adjustment.adjusted_value.toString() : currentValue.toString());
+  };
+
+  const submitAdjustment = () => {
+    if (!editingAdjustment || !adjustmentValue) return;
+    
+    adjustBillMutation.mutate({
+      billId: editingAdjustment.billId,
+      value: parseFloat(adjustmentValue)
+    });
+  };
+
+  // Função para obter o valor atual da conta (considerando ajustes)
+  const getCurrentBillValue = (bill: RecurringBill) => {
+    const adjustment = billAdjustments.find(adj => adj.bill_id === bill.id);
+    return adjustment ? adjustment.adjusted_value : bill.value;
   };
 
   // Calcular saldos atuais dos bancos
@@ -518,83 +611,139 @@ const Contas = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {bills.map((bill) => (
-                <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => togglePaidMutation.mutate({ id: bill.id, paid: !bill.paid_this_month })}
-                      className="p-1"
-                    >
-                      {bill.paid_this_month ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-red-600" />
-                      )}
-                    </Button>
-                    
-                    <div>
-                      <h3 className={`font-medium ${bill.paid_this_month ? 'line-through text-gray-500' : ''}`}>
-                        {bill.name}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Vencimento: dia {bill.due_date} • {bill.category} • {bill.bank}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className={`font-bold ${bill.paid_this_month ? 'text-gray-500' : 'text-red-600'}`}>
-                        {bill.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {bill.recurring ? 'Recorrente' : 'Único'}
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-2">
+              {bills.map((bill) => {
+                const currentValue = getCurrentBillValue(bill);
+                const hasAdjustment = billAdjustments.some(adj => adj.bill_id === bill.id);
+                
+                return (
+                  <div key={bill.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-4">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleEdit(bill)}
+                        onClick={() => togglePaidMutation.mutate({ id: bill.id, paid: !bill.paid_this_month })}
+                        className="p-1"
                       >
-                        <Edit className="h-4 w-4" />
+                        {bill.paid_this_month ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-600" />
+                        )}
                       </Button>
                       
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir Conta</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir a conta "{bill.name}"? Esta ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => deleteBillMutation.mutate(bill.id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <div>
+                        <h3 className={`font-medium ${bill.paid_this_month ? 'line-through text-gray-500' : ''}`}>
+                          {bill.name}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Vencimento: dia {bill.due_date} • {bill.category} • {bill.bank}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-bold ${bill.paid_this_month ? 'text-gray-500' : 'text-red-600'}`}>
+                            {currentValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          {hasAdjustment && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              Ajustado
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {bill.recurring ? 'Recorrente' : 'Único'}
+                        </p>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAdjustValue(bill.id, bill.value)}
+                          title="Ajustar valor deste mês"
+                        >
+                          <Edit className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(bill)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-red-600">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir Conta</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir a conta "{bill.name}"? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => deleteBillMutation.mutate(bill.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Ajuste de Valor */}
+      <Dialog open={!!editingAdjustment} onOpenChange={() => setEditingAdjustment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustar Valor deste Mês</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="adjustment_value">Valor para este mês</Label>
+              <Input
+                id="adjustment_value"
+                type="number"
+                step="0.01"
+                value={adjustmentValue}
+                onChange={(e) => setAdjustmentValue(e.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Este ajuste vale apenas para o mês atual e não afetará os próximos meses.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setEditingAdjustment(null)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button onClick={submitAdjustment} className="flex-1">
+                Confirmar Ajuste
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Saldos por Banco */}
       <Card>
