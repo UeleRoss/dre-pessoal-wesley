@@ -1,3 +1,4 @@
+
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
@@ -6,6 +7,8 @@ import {
   TrendingUp,
   PiggyBank
 } from "lucide-react";
+import UserNameEditor from "./UserNameEditor";
+import { useUserName } from "@/hooks/useUserName";
 
 const navigation = [
   { name: "Lançamentos", href: "/lancamentos", icon: Receipt },
@@ -15,6 +18,7 @@ const navigation = [
 
 const Layout = () => {
   const location = useLocation();
+  const { userName, updateUserName } = useUserName();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy-50 to-navy-100 w-full">
@@ -27,7 +31,10 @@ const Layout = () => {
                 <TrendingUp className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">DRE Pessoal Wesley</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-white">DRE Pessoal {userName}</h1>
+                  <UserNameEditor currentName={userName} onNameChange={updateUserName} />
+                </div>
                 <p className="text-navy-200 text-sm">Controle Financeiro Pessoal</p>
               </div>
             </div>
