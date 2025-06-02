@@ -91,17 +91,26 @@ const Investimentos = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Buscar categorias de investimento (padrão + personalizadas)
+  // Buscar categorias de investimento (padrão + personalizadas do usuário)
   const { data: investmentCategories = [] } = useQuery({
-    queryKey: ['investment-categories'],
+    queryKey: ['investment-categories', user?.id],
     queryFn: async () => {
+      if (!user?.id) {
+        console.log("Usuário não logado, retornando apenas categorias padrão");
+        return DEFAULT_INVESTMENT_CATEGORIES.sort();
+      }
+
+      console.log("Buscando categorias de investimento para usuário:", user.id);
+
       const { data, error } = await supabase
         .from('investment_categories')
         .select('*')
+        .eq('user_id', user.id)
         .order('name');
       
       if (error) {
-        // Se a tabela não existir ainda, usar apenas as categorias padrão
+        console.error("Erro ao buscar categorias:", error);
+        // Se houver erro, retornar apenas as categorias padrão
         return DEFAULT_INVESTMENT_CATEGORIES.sort();
       }
       
@@ -116,8 +125,12 @@ const Investimentos = () => {
         }
       });
       
+      console.log("Categorias de investimento carregadas:", allCategories);
       return allCategories.sort();
-    }
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
   });
 
   // Buscar investimentos

@@ -31,44 +31,55 @@ const InvestmentCategoryManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar categorias de investimento personalizadas
-  const { data: allCategories = [] } = useQuery({
-    queryKey: ['investment-categories-manager'],
+  // Buscar apenas categorias personalizadas do usuário logado
+  const { data: userCategories = [] } = useQuery({
+    queryKey: ['user-investment-categories'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      console.log("Buscando categorias de investimento para usuário:", user.id);
+
       const { data, error } = await supabase
         .from('investment_categories')
         .select('*')
+        .eq('user_id', user.id)
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar categorias de investimento:", error);
+        throw error;
+      }
       
-      // Combinar categorias padrão com personalizadas
-      const customCategories = data as InvestmentCategory[];
-      const existingNames = customCategories.map(cat => cat.name);
-      
-      // Adicionar categorias padrão que não existem ainda
-      const defaultCategoriesToAdd = DEFAULT_INVESTMENT_CATEGORIES
-        .filter(name => !existingNames.includes(name))
-        .map(name => ({
-          id: `default-${name}`,
-          name,
-          user_id: 'default',
-          is_default: true
-        }));
-      
-      return [...defaultCategoriesToAdd, ...customCategories];
+      console.log("Categorias de investimento encontradas:", data);
+      return data as InvestmentCategory[];
     }
   });
+
+  // Combinar categorias padrão com personalizadas
+  const getAllCategories = () => {
+    const allCategories = [
+      ...DEFAULT_INVESTMENT_CATEGORIES.map(name => ({
+        id: `default-${name}`,
+        name,
+        user_id: 'default',
+        is_default: true
+      })),
+      ...userCategories
+    ];
+    
+    return allCategories;
+  };
 
   // Mutation para adicionar categoria de investimento
   const addCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) throw new Error('Usuário não autenticado');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
         .from('investment_categories')
-        .insert([{ name, user_id: user.data.user.id }])
+        .insert([{ name, user_id: user.id }])
         .select()
         .single();
       
@@ -76,7 +87,7 @@ const InvestmentCategoryManager = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['investment-categories-manager'] });
+      queryClient.invalidateQueries({ queryKey: ['user-investment-categories'] });
       queryClient.invalidateQueries({ queryKey: ['investment-categories'] });
       setNewCategory("");
       toast({
@@ -84,7 +95,8 @@ const InvestmentCategoryManager = () => {
         description: "Nova categoria de investimento criada com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Erro ao adicionar categoria:", error);
       toast({
         title: "Erro",
         description: "Erro ao adicionar categoria.",
@@ -108,7 +120,7 @@ const InvestmentCategoryManager = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['investment-categories-manager'] });
+      queryClient.invalidateQueries({ queryKey: ['user-investment-categories'] });
       queryClient.invalidateQueries({ queryKey: ['investment-categories'] });
       toast({
         title: "Categoria removida",
@@ -116,6 +128,7 @@ const InvestmentCategoryManager = () => {
       });
     },
     onError: (error: any) => {
+      console.error("Erro ao remover categoria:", error);
       toast({
         title: "Erro",
         description: error.message || "Erro ao remover categoria.",
@@ -128,6 +141,7 @@ const InvestmentCategoryManager = () => {
     if (!newCategory.trim()) return;
     
     // Verificar se não é duplicata
+    const allCategories = getAllCategories();
     if (allCategories.some(cat => cat.name === newCategory.trim())) {
       toast({
         title: "Categoria já existe",
@@ -139,6 +153,8 @@ const InvestmentCategoryManager = () => {
     
     addCategoryMutation.mutate(newCategory.trim());
   };
+
+  const allCategories = getAllCategories();
 
   return (
     <Card>
