@@ -3,8 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { BANKS, CATEGORIES } from "./constants";
+import { CATEGORIES } from "./constants";
 import { BillFormData } from "./types";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BillFormFieldsProps {
   formData: BillFormData;
@@ -12,9 +14,39 @@ interface BillFormFieldsProps {
 }
 
 export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps) => {
+  // Buscar bancos do usuário
+  const { data: userBanks = [] } = useQuery({
+    queryKey: ['user-banks-form'],
+    queryFn: async () => {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) return [];
+
+      // Buscar bancos configurados
+      const { data: bankBalances, error: balanceError } = await supabase
+        .from('bank_balances')
+        .select('bank_name')
+        .eq('user_id', user.data.user.id);
+      
+      if (balanceError) throw balanceError;
+
+      // Buscar bancos dos lançamentos
+      const { data: financialItems, error: itemsError } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.data.user.id);
+      
+      if (itemsError) throw itemsError;
+
+      const configuredBanks = bankBalances.map(b => b.bank_name);
+      const transactionBanks = [...new Set(financialItems.map(item => item.bank))].filter(Boolean);
+      
+      return [...new Set([...configuredBanks, ...transactionBanks])].sort();
+    }
+  });
+
   // Use safe values for selects - never empty strings
   const safeCategory = formData.category && CATEGORIES.includes(formData.category) ? formData.category : undefined;
-  const safeBank = formData.bank === "NONE" || (formData.bank && BANKS.includes(formData.bank)) ? formData.bank : undefined;
+  const safeBank = formData.bank === "NONE" || (formData.bank && userBanks.includes(formData.bank)) ? formData.bank : undefined;
 
   return (
     <>
@@ -86,7 +118,7 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="NONE">Sem banco específico</SelectItem>
-            {BANKS.map((bank) => (
+            {userBanks.map((bank) => (
               <SelectItem key={bank} value={bank}>
                 {bank}
               </SelectItem>

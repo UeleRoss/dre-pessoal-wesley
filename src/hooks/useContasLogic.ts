@@ -1,10 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
 interface RecurringBill {
   id: string;
@@ -45,6 +42,36 @@ export const useContasLogic = (selectedMonth: Date) => {
 
   // Formatação do mês para consultas
   const currentMonthKey = selectedMonth.toISOString().slice(0, 10).substring(0, 7) + '-01'; // YYYY-MM-01
+
+  // Buscar bancos do usuário
+  const { data: userBanks = [] } = useQuery({
+    queryKey: ['user-banks-contas', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      // Buscar bancos configurados
+      const { data: bankBalances, error: balanceError } = await supabase
+        .from('bank_balances')
+        .select('bank_name')
+        .eq('user_id', user.id);
+      
+      if (balanceError) throw balanceError;
+
+      // Buscar bancos dos lançamentos
+      const { data: financialItems, error: itemsError } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.id);
+      
+      if (itemsError) throw itemsError;
+
+      const configuredBanks = bankBalances.map(b => b.bank_name);
+      const transactionBanks = [...new Set(financialItems.map(item => item.bank))].filter(Boolean);
+      
+      return [...new Set([...configuredBanks, ...transactionBanks])].sort();
+    },
+    enabled: !!user?.id
+  });
 
   useEffect(() => {
     console.log("🔐 Verificando autenticação...");
@@ -398,7 +425,7 @@ export const useContasLogic = (selectedMonth: Date) => {
   const calculateCurrentBalances = () => {
     const balances: Record<string, number> = {};
     
-    BANKS.forEach(bank => {
+    userBanks.forEach(bank => {
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
       const initialBalance = bankConfig?.initial_balance || 0;
       
@@ -428,13 +455,7 @@ export const useContasLogic = (selectedMonth: Date) => {
     
     const currentBalances = calculateCurrentBalances();
     
-    // Considerar apenas C6 BANK, ASAAS e CONTA SIMPLES para o saldo restante
-    const relevantBanks = ['C6 BANK', 'ASAAS', 'CONTA SIMPLES'];
-    const totalCashForBills = relevantBanks.reduce((sum, bank) => {
-      return sum + (currentBalances[bank] || 0);
-    }, 0);
-    
-    // Total geral de todos os bancos para outros cálculos
+    // Considerar todos os bancos do usuário para cálculos
     const totalCash = Object.values(currentBalances).reduce((sum, balance) => sum + balance, 0);
     
     return {
@@ -442,7 +463,7 @@ export const useContasLogic = (selectedMonth: Date) => {
       paidBills,
       unpaidBills,
       totalCash,
-      remainingCash: totalCashForBills - unpaidBills
+      remainingCash: totalCash - unpaidBills
     };
   };
 
@@ -469,6 +490,7 @@ export const useContasLogic = (selectedMonth: Date) => {
     bankBalances,
     monthlyItems,
     billInstances,
+    userBanks,
     createBillMutation,
     updateBillMutation,
     adjustBillMutation,

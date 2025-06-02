@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,8 +23,6 @@ interface Category {
   user_id?: string;
   is_default?: boolean;
 }
-
-const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
 // Categorias específicas por tipo
 const SAIDA_CATEGORIES = [
@@ -65,6 +62,37 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Buscar bancos do usuário
+  const { data: userBanks = [] } = useQuery({
+    queryKey: ['user-banks-modal'],
+    queryFn: async () => {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) return [];
+
+      // Buscar bancos configurados
+      const { data: bankBalances, error: balanceError } = await supabase
+        .from('bank_balances')
+        .select('bank_name')
+        .eq('user_id', user.data.user.id);
+      
+      if (balanceError) throw balanceError;
+
+      // Buscar bancos dos lançamentos
+      const { data: financialItems, error: itemsError } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.data.user.id);
+      
+      if (itemsError) throw itemsError;
+
+      const configuredBanks = bankBalances.map(b => b.bank_name);
+      const transactionBanks = [...new Set(financialItems.map(item => item.bank))].filter(Boolean);
+      
+      return [...new Set([...configuredBanks, ...transactionBanks])].sort();
+    },
+    enabled: isOpen
+  });
 
   // Buscar categorias personalizadas do usuário
   const { data: customCategories = [] } = useQuery({
@@ -332,7 +360,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectValue placeholder="Selecione o banco" />
               </SelectTrigger>
               <SelectContent>
-                {BANKS.map((bank) => (
+                {userBanks.map((bank) => (
                   <SelectItem key={bank} value={bank}>
                     {bank}
                   </SelectItem>
