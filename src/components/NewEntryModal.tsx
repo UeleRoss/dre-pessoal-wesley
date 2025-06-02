@@ -65,8 +65,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Usar o hook personalizado para bancos
-  const { userBanks } = useUserBanks();
+  // Usar o hook personalizado para bancos - corrigindo o nome da propriedade
+  const { allUserBanks } = useUserBanks();
 
   // Buscar categorias personalizadas do usuário logado
   const { data: customCategories = [] } = useQuery({
@@ -323,7 +323,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectValue placeholder="Selecione o banco" />
               </SelectTrigger>
               <SelectContent>
-                {userBanks.map((bank) => (
+                {(allUserBanks || []).map((bank) => (
                   <SelectItem key={bank} value={bank}>
                     {bank}
                   </SelectItem>
