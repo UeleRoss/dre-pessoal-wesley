@@ -61,6 +61,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   });
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [user, setUser] = useState<any>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -68,25 +69,40 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   // Usar o hook personalizado para bancos - corrigindo o nome da propriedade
   const { allUserBanks } = useUserBanks();
 
+  // Buscar usuário atual
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
+
   // Buscar categorias personalizadas do usuário logado
   const { data: customCategories = [] } = useQuery({
-    queryKey: ['custom-categories', formData.type],
+    queryKey: ['custom-categories', formData.type, user?.id],
     queryFn: async () => {
-      if (!formData.type) return [];
+      if (!formData.type || !user?.id) return [];
       
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-
+      console.log("Buscando categorias para tipo:", formData.type, "usuário:", user.id);
+      
       const { data, error } = await supabase
         .from('categories')
         .select('*')
         .eq('user_id', user.id)
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar categorias:", error);
+        throw error;
+      }
+      
+      console.log("Categorias encontradas:", data);
       return data as Category[];
     },
-    enabled: !!formData.type && isOpen
+    enabled: !!formData.type && !!user?.id && isOpen,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    cacheTime: 10 * 60 * 1000, // 10 minutos
   });
 
   // Combinar categorias padrão com personalizadas baseado no tipo
@@ -110,8 +126,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   // Criar nova categoria
   const createCategoryMutation = useMutation({
     mutationFn: async (categoryName: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
+      if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
         .from('categories')
@@ -135,7 +150,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       setShowNewCategoryInput(false);
       queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Erro ao criar categoria:", error);
       toast({
         title: "Erro",
         description: "Erro ao criar categoria.",
@@ -146,8 +162,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
+      if (!user?.id) throw new Error('Usuário não autenticado');
 
       const { error } = await supabase
         .from('financial_items')
@@ -167,7 +182,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       onSuccess();
       onClose();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Erro ao criar lançamento:", error);
       toast({
         title: "Erro",
         description: "Erro ao criar lançamento.",
@@ -224,7 +240,10 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
             <Label htmlFor="type">Tipo</Label>
             <Select
               value={formData.type}
-              onValueChange={(value) => setFormData({ ...formData, type: value })}
+              onValueChange={(value) => {
+                console.log("Tipo selecionado:", value);
+                setFormData({ ...formData, type: value });
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo" />
