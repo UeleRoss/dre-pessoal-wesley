@@ -14,30 +14,35 @@ export const useInvestmentCategories = (user: any) => {
 
       console.log("Buscando categorias de investimento para usuário:", user.id);
 
-      const { data, error } = await supabase
-        .from('investment_categories')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
-      
-      if (error) {
-        console.error("Erro ao buscar categorias:", error);
+      try {
+        const { data, error } = await supabase
+          .from('investment_categories')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name');
+        
+        if (error) {
+          console.error("Erro ao buscar categorias:", error);
+          return DEFAULT_INVESTMENT_CATEGORIES.sort();
+        }
+        
+        const customCategories = data ? data.map(cat => cat.name) : [];
+        const allCategories = [...DEFAULT_INVESTMENT_CATEGORIES];
+        
+        customCategories.forEach(cat => {
+          if (!allCategories.includes(cat)) {
+            allCategories.push(cat);
+          }
+        });
+        
+        console.log("Categorias de investimento carregadas:", allCategories);
+        return allCategories.sort();
+      } catch (error) {
+        console.error("Erro inesperado ao buscar categorias:", error);
         return DEFAULT_INVESTMENT_CATEGORIES.sort();
       }
-      
-      const customCategories = data.map(cat => cat.name);
-      const allCategories = [...DEFAULT_INVESTMENT_CATEGORIES];
-      
-      customCategories.forEach(cat => {
-        if (!allCategories.includes(cat)) {
-          allCategories.push(cat);
-        }
-      });
-      
-      console.log("Categorias de investimento carregadas:", allCategories);
-      return allCategories.sort();
     },
-    enabled: !!user,
+    enabled: true,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -65,14 +66,18 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Usar o hook personalizado para bancos - corrigindo o nome da propriedade
+  // Usar o hook personalizado para bancos
   const { allUserBanks } = useUserBanks();
 
   // Buscar usuário atual
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        console.error("Erro ao buscar usuário:", error);
+      }
     };
     getUser();
   }, []);
@@ -85,23 +90,28 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       
       console.log("Buscando categorias para tipo:", formData.type, "usuário:", user.id);
       
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
-      
-      if (error) {
-        console.error("Erro ao buscar categorias:", error);
-        throw error;
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name');
+        
+        if (error) {
+          console.error("Erro ao buscar categorias:", error);
+          return [];
+        }
+        
+        console.log("Categorias encontradas:", data || []);
+        return data as Category[];
+      } catch (error) {
+        console.error("Erro inesperado ao buscar categorias:", error);
+        return [];
       }
-      
-      console.log("Categorias encontradas:", data);
-      return data as Category[];
     },
     enabled: !!formData.type && !!user?.id && isOpen,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   // Combinar categorias padrão com personalizadas baseado no tipo

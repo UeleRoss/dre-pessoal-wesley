@@ -17,6 +17,7 @@ export interface InvestmentTransaction {
   description?: string;
   date: string;
   created_at: string;
+  user_id: string;
 }
 
 export interface InvestmentForm {
