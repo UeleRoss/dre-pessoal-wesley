@@ -9,24 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-// Categorias iniciais que servem como base
-const INITIAL_CATEGORIES = [
-  "Carro",
-  "Comida", 
-  "Contas Mensais",
-  "Entre bancos",
-  "Escritório",
-  "Estudos",
-  "Go On Outdoor",
-  "Imposto",
-  "Investimentos",
-  "Lazer e ócio",
-  "Pro-Labore",
-  "Vida esportiva",
-  "Anúncios Online",
-  "Itens Físicos"
-];
-
 interface Category {
   id: string;
   name: string;
@@ -39,44 +21,33 @@ const CategoryManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar todas as categorias (padrão + personalizadas)
-  const { data: allCategories = [] } = useQuery({
-    queryKey: ['all-categories'],
+  // Buscar apenas categorias personalizadas do usuário logado
+  const { data: userCategories = [] } = useQuery({
+    queryKey: ['user-categories'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .eq('user_id', user.id)
         .order('name');
       
       if (error) throw error;
-      
-      // Combinar categorias padrão com personalizadas
-      const customCategories = data as Category[];
-      const existingNames = customCategories.map(cat => cat.name);
-      
-      // Adicionar categorias padrão que não existem ainda
-      const defaultCategoriesToAdd = INITIAL_CATEGORIES
-        .filter(name => !existingNames.includes(name))
-        .map(name => ({
-          id: `default-${name}`,
-          name,
-          user_id: 'default',
-          is_default: true
-        }));
-      
-      return [...defaultCategoriesToAdd, ...customCategories];
+      return data as Category[];
     }
   });
 
   // Mutation para adicionar categoria
   const addCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) throw new Error('Usuário não autenticado');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
         .from('categories')
-        .insert([{ name, user_id: user.data.user.id }])
+        .insert([{ name, user_id: user.id }])
         .select()
         .single();
       
@@ -84,7 +55,7 @@ const CategoryManager = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['user-categories'] });
       setNewCategory("");
       toast({
         title: "Categoria adicionada",
@@ -103,10 +74,6 @@ const CategoryManager = () => {
   // Mutation para remover categoria
   const deleteCategoryMutation = useMutation({
     mutationFn: async (category: Category) => {
-      if (category.is_default) {
-        throw new Error('Não é possível excluir categorias padrão');
-      }
-      
       const { error } = await supabase
         .from('categories')
         .delete()
@@ -115,16 +82,16 @@ const CategoryManager = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['user-categories'] });
       toast({
         title: "Categoria removida",
         description: "Categoria removida com sucesso!",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao remover categoria.",
+        description: "Erro ao remover categoria.",
         variant: "destructive",
       });
     }
@@ -134,7 +101,7 @@ const CategoryManager = () => {
     if (!newCategory.trim()) return;
     
     // Verificar se não é duplicata
-    if (allCategories.some(cat => cat.name === newCategory.trim())) {
+    if (userCategories.some(cat => cat.name === newCategory.trim())) {
       toast({
         title: "Categoria já existe",
         description: "Esta categoria já está disponível.",
@@ -149,7 +116,7 @@ const CategoryManager = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Gerenciar Categorias</CardTitle>
+        <CardTitle>Minhas Categorias Personalizadas</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
@@ -167,32 +134,27 @@ const CategoryManager = () => {
           </Button>
         </div>
 
-        {allCategories.length > 0 ? (
+        {userCategories.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {allCategories.map((category) => (
+            {userCategories.map((category) => (
               <div key={category.id} className="flex items-center gap-2 p-2 border rounded">
-                <Badge 
-                  variant={category.is_default ? "secondary" : "outline"} 
-                  className="flex-1 text-center"
-                >
+                <Badge variant="outline" className="flex-1 text-center">
                   {category.name}
                 </Badge>
-                {!category.is_default && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteCategoryMutation.mutate(category)}
-                    disabled={deleteCategoryMutation.isPending}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => deleteCategoryMutation.mutate(category)}
+                  disabled={deleteCategoryMutation.isPending}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">Nenhuma categoria encontrada.</p>
+          <p className="text-sm text-gray-500">Nenhuma categoria personalizada criada ainda.</p>
         )}
       </CardContent>
     </Card>

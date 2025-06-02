@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentBrazilDate } from "@/utils/dateUtils";
 import { Pencil } from "lucide-react";
+import { useUserBanks } from "@/hooks/useUserBanks";
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -63,52 +65,28 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar bancos do usuário
-  const { data: userBanks = [] } = useQuery({
-    queryKey: ['user-banks-modal'],
-    queryFn: async () => {
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) return [];
+  // Usar o hook personalizado para bancos
+  const { userBanks } = useUserBanks();
 
-      // Buscar bancos configurados
-      const { data: bankBalances, error: balanceError } = await supabase
-        .from('bank_balances')
-        .select('bank_name')
-        .eq('user_id', user.data.user.id);
-      
-      if (balanceError) throw balanceError;
-
-      // Buscar bancos dos lançamentos
-      const { data: financialItems, error: itemsError } = await supabase
-        .from('financial_items')
-        .select('bank')
-        .eq('user_id', user.data.user.id);
-      
-      if (itemsError) throw itemsError;
-
-      const configuredBanks = bankBalances.map(b => b.bank_name);
-      const transactionBanks = [...new Set(financialItems.map(item => item.bank))].filter(Boolean);
-      
-      return [...new Set([...configuredBanks, ...transactionBanks])].sort();
-    },
-    enabled: isOpen
-  });
-
-  // Buscar categorias personalizadas do usuário
+  // Buscar categorias personalizadas do usuário logado
   const { data: customCategories = [] } = useQuery({
     queryKey: ['custom-categories', formData.type],
     queryFn: async () => {
       if (!formData.type) return [];
       
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .eq('user_id', user.id)
         .order('name');
       
       if (error) throw error;
       return data as Category[];
     },
-    enabled: !!formData.type
+    enabled: !!formData.type && isOpen
   });
 
   // Combinar categorias padrão com personalizadas baseado no tipo
@@ -116,13 +94,6 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     if (!formData.type) return [];
     
     const defaultCategories = formData.type === 'saida' ? SAIDA_CATEGORIES : ENTRADA_CATEGORIES;
-    const customCategoryNames = customCategories.map(cat => cat.name);
-    
-    // Filtrar categorias personalizadas que se aplicam ao tipo atual
-    const relevantCustomCategories = customCategories.filter(cat => {
-      // Adicionar lógica se quiser categorizar as personalizadas por tipo
-      return true; // Por enquanto, mostrar todas as personalizadas
-    });
     
     const allCategories = [
       ...defaultCategories.map(name => ({
@@ -130,7 +101,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         name,
         is_default: true
       })),
-      ...relevantCustomCategories
+      ...customCategories
     ];
     
     return allCategories;
@@ -139,12 +110,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   // Criar nova categoria
   const createCategoryMutation = useMutation({
     mutationFn: async (categoryName: string) => {
-      const { data: session } = await supabase.auth.getSession();
-      const user = session?.session?.user;
-
-      if (!user) {
-        throw new Error('Usuário não autenticado');
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
         .from('categories')
@@ -179,12 +146,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const { data: session } = await supabase.auth.getSession();
-      const user = session?.session?.user;
-
-      if (!user) {
-        throw new Error('Usuário não autenticado');
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
 
       const { error } = await supabase
         .from('financial_items')
