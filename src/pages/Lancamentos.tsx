@@ -83,7 +83,8 @@ const Lancamentos = () => {
       
       const { data, error } = await supabase
         .from('bank_balances')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
       
       if (error) throw error;
       return data;
@@ -105,7 +106,7 @@ const Lancamentos = () => {
       
       if (error) throw error;
       
-      const banksFromItems = [...new Set(itemsBanks.map(item => item.bank))];
+      const banksFromItems = [...new Set(itemsBanks.map(item => item.bank))].filter(Boolean);
       const banksFromBalances = bankBalances.map(balance => balance.bank_name);
       
       // Combinar bancos dos lançamentos e bancos configurados
@@ -131,42 +132,56 @@ const Lancamentos = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Calcular saldos atuais dos bancos considerando apenas lançamentos após configuração
+  // Calcular saldos atuais dos bancos corrigido
   const calculateBankBalances = () => {
+    console.log("Calculando saldos dos bancos...");
+    console.log("Período selecionado:", periodType, selectedMonth);
+    console.log("Itens financeiros do período:", financialItems.length);
+
     return availableBanks.map(bank => {
       // Saldo inicial configurado
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
       const initialBalance = bankConfig?.initial_balance || 0;
       
-      // Data de configuração do saldo (usar updated_at como referência)
-      const configDate = bankConfig?.updated_at;
+      console.log(`\n=== Calculando saldo para ${bank} ===`);
+      console.log("Saldo inicial configurado:", initialBalance);
       
-      // Movimentações deste banco no período, considerando apenas após a configuração
-      let bankItems = financialItems.filter(item => item.bank === bank);
+      // Para calcular o saldo atual, considerar TODOS os lançamentos do banco até agora
+      // independente do período selecionado na tela
+      let allBankItems = allItems.filter(item => item.bank === bank && item.source !== 'financial_summary' && item.source !== 'financial_summary_income');
       
-      // Se há data de configuração, filtrar apenas lançamentos posteriores
-      if (configDate) {
-        bankItems = bankItems.filter(item => item.created_at > configDate);
-      }
+      console.log("Total de lançamentos deste banco (todos os períodos):", allBankItems.length);
       
-      const periodMovement = bankItems.reduce((sum, item) => {
+      // Calcular o saldo baseado em TODOS os lançamentos
+      const totalMovement = allBankItems.reduce((sum, item) => {
+        const amount = item.type === 'entrada' ? item.amount : -item.amount;
+        console.log(`  ${item.date}: ${item.type} ${item.amount} (${item.description}) = ${amount}`);
+        return sum + amount;
+      }, 0);
+      
+      console.log("Movimento total de todos os tempos:", totalMovement);
+      
+      // Saldo atual = saldo inicial + todos os movimentos
+      const currentBalance = initialBalance + totalMovement;
+      
+      console.log("Saldo atual calculado:", currentBalance);
+      
+      // Para calcular a mudança, vamos usar apenas os itens do período atual
+      const periodBankItems = financialItems.filter(item => item.bank === bank && item.source !== 'financial_summary' && item.source !== 'financial_summary_income');
+      const periodMovement = periodBankItems.reduce((sum, item) => {
         return item.type === 'entrada' ? sum + item.amount : sum - item.amount;
       }, 0);
       
-      // Saldo atual = saldo inicial + movimentações após configuração
-      const currentBalance = initialBalance + periodMovement;
+      // O saldo anterior seria o saldo atual menos o movimento do período
+      const previousBalance = currentBalance - periodMovement;
       
-      console.log(`Banco ${bank}:`, {
-        initialBalance,
-        periodMovement,
-        currentBalance,
-        configDate
-      });
+      console.log("Movimento do período atual:", periodMovement);
+      console.log("Saldo anterior (calculado):", previousBalance);
       
       return {
         name: bank,
         balance: currentBalance,
-        previousBalance: initialBalance
+        previousBalance: previousBalance
       };
     });
   };
