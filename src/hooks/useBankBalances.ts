@@ -92,7 +92,7 @@ export const useCalculatedBankBalances = (
       
       console.log("Saldo atual calculado:", currentBalance);
       
-      // Para calcular a mudança, usar apenas os itens do período atual
+      // Para calcular o saldo anterior, precisamos saber qual período estamos vendo
       const periodBankItems = periodItems.filter(item => 
         item.bank === bank && 
         item.source !== 'financial_summary' && 
@@ -102,42 +102,22 @@ export const useCalculatedBankBalances = (
       let previousBalance;
 
       if (periodBankItems.length === 0) {
+        // Se não há itens no período atual para este banco, o saldo anterior é igual ao atual
         previousBalance = currentBalance;
         console.log("Nenhum item no período, saldo anterior igual ao saldo atual:", previousBalance);
       } else {
-        // Encontrar a data de início do período (menor data em periodBankItems)
-        const periodStartDates = periodBankItems.map(item => new Date(item.date).getTime());
-        const minPeriodDateTimestamp = Math.min(...periodStartDates);
-        const periodStartDate = new Date(minPeriodDateTimestamp);
-
-        console.log("Data de início do período:", periodStartDate.toISOString());
-
-        // Filtrar allItems para transações ANTERIORES à data de início do período para o banco atual
-        const itemsBeforePeriod = allBankItems.filter(item => {
-          const itemDate = new Date(item.date);
-          return itemDate.getTime() < periodStartDate.getTime();
-        });
-
-        console.log("Itens anteriores ao início do período:", itemsBeforePeriod.length);
-
-        // Somar os valores dessas transações
-        const movementBeforePeriod = itemsBeforePeriod.reduce((sum, item) => {
+        // Calcular movimento apenas do período atual
+        const periodMovement = periodBankItems.reduce((sum, item) => {
           const amount = item.type === 'entrada' ? item.amount : -item.amount;
           return sum + amount;
         }, 0);
-
-        console.log("Movimento total antes do período:", movementBeforePeriod);
-
-        // Saldo anterior = saldo inicial + movimento antes do período
-        previousBalance = initialBalance + movementBeforePeriod;
-        console.log("Saldo anterior (calculado com nova lógica):", previousBalance);
+        
+        console.log("Movimento do período atual:", periodMovement);
+        
+        // Saldo anterior = saldo atual - movimento do período atual
+        previousBalance = currentBalance - periodMovement;
+        console.log("Saldo anterior (saldo atual - movimento do período):", previousBalance);
       }
-
-      // Movimento do período (usado apenas para log, não mais para cálculo do previousBalance diretamente)
-      const periodMovement = periodBankItems.reduce((sum, item) => {
-        return item.type === 'entrada' ? sum + item.amount : sum - item.amount;
-      }, 0);
-      console.log("Movimento do período atual (apenas para informação):", periodMovement);
       
       return {
         name: bank,
