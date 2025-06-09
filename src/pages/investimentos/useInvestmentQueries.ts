@@ -1,7 +1,7 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_INVESTMENT_CATEGORIES } from "./constants";
+import type { InvestmentTransaction } from "./types";
 
 export const useInvestmentCategories = (user: any) => {
   return useQuery({
@@ -80,7 +80,12 @@ export const useInvestmentTransactions = (user: any) => {
         .order('date', { ascending: false });
       
       if (error) throw error;
-      return data;
+      
+      // Type cast the data to ensure proper TypeScript types
+      return (data || []).map(transaction => ({
+        ...transaction,
+        type: transaction.type as 'aporte' | 'retirada'
+      })) as InvestmentTransaction[];
     },
     enabled: !!user?.id
   });
