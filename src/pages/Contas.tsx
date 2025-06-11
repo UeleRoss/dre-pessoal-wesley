@@ -8,6 +8,7 @@ import EditBillModal from "@/components/contas/EditBillModal";
 import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
 import CreditCardChargesSection from "@/components/contas/CreditCardChargesSection";
 import MonthSelector from "@/components/contas/MonthSelector";
+import DownloadContasButton from "@/components/contas/DownloadContasButton";
 import { useContasLogic } from "@/hooks/useContasLogic";
 import { useState } from "react";
 
@@ -104,7 +105,13 @@ const Contas = () => {
           <p className="text-navy-600 mt-1">Gerencie suas contas fixas e previsão de caixa</p>
         </div>
         
-        <NewBillButton onSubmit={handleNewBillSubmit} />
+        <div className="flex gap-2">
+          <DownloadContasButton 
+            bills={bills}
+            selectedMonth={selectedMonth}
+          />
+          <NewBillButton onSubmit={handleNewBillSubmit} />
+        </div>
       </div>
 
       <MonthSelector 
