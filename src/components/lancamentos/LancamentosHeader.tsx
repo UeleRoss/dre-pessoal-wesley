@@ -1,6 +1,7 @@
 
 import { PeriodType } from "@/components/PeriodSelector";
 import LancamentosHeaderControls from "@/components/LancamentosHeader";
+import { FinancialItem } from "@/types/financial";
 
 interface LancamentosHeaderProps {
   onNewEntry: () => void;
@@ -8,6 +9,7 @@ interface LancamentosHeaderProps {
   onMonthChange: (month: Date) => void;
   periodType: PeriodType;
   onPeriodTypeChange: (type: PeriodType) => void;
+  financialItems?: FinancialItem[];
 }
 
 const LancamentosHeader = ({
@@ -15,7 +17,8 @@ const LancamentosHeader = ({
   selectedMonth,
   onMonthChange,
   periodType,
-  onPeriodTypeChange
+  onPeriodTypeChange,
+  financialItems
 }: LancamentosHeaderProps) => {
   return (
     <div className="animate-fade-in">
@@ -25,6 +28,7 @@ const LancamentosHeader = ({
         onMonthChange={onMonthChange}
         periodType={periodType}
         onPeriodTypeChange={onPeriodTypeChange}
+        financialItems={financialItems}
       />
     </div>
   );

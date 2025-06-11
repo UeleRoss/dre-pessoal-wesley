@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Auth from "@/components/Auth";
@@ -58,6 +57,7 @@ const LancamentosContainer = () => {
           onMonthChange={lancamentosState.setSelectedMonth}
           periodType={periodType}
           onPeriodTypeChange={lancamentosState.setPeriodType}
+          financialItems={financialItems}
         />
 
         <LancamentosContent

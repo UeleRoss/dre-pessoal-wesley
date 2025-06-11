@@ -5,6 +5,8 @@ import { Plus, Calendar, TrendingUp } from "lucide-react";
 import PeriodSelector, { PeriodType } from "./PeriodSelector";
 import MonthlySummaryModal from "./MonthlySummaryModal";
 import IncomeSummaryModal from "./IncomeSummaryModal";
+import DownloadButton from "./DownloadButton";
+import { FinancialItem } from "@/types/financial";
 
 interface LancamentosHeaderProps {
   onNewEntry: () => void;
@@ -12,6 +14,7 @@ interface LancamentosHeaderProps {
   onMonthChange: (date: Date) => void;
   periodType: PeriodType;
   onPeriodTypeChange: (type: PeriodType) => void;
+  financialItems?: FinancialItem[];
 }
 
 const LancamentosHeader = ({ 
@@ -19,7 +22,8 @@ const LancamentosHeader = ({
   selectedMonth, 
   onMonthChange, 
   periodType, 
-  onPeriodTypeChange 
+  onPeriodTypeChange,
+  financialItems = []
 }: LancamentosHeaderProps) => {
   const [showMonthlySummaryModal, setShowMonthlySummaryModal] = useState(false);
   const [showIncomeSummaryModal, setShowIncomeSummaryModal] = useState(false);
@@ -67,6 +71,12 @@ const LancamentosHeader = ({
             <TrendingUp className="h-4 w-4 mr-2" />
             Receitas Mensais
           </Button>
+
+          <DownloadButton
+            financialItems={financialItems}
+            selectedMonth={selectedMonth}
+            periodType={periodType}
+          />
         </div>
       </div>
 
