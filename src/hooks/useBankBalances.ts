@@ -60,9 +60,8 @@ export const useCalculatedBankBalances = (
   periodItems: FinancialItem[]
 ) => {
   return useMemo(() => {
-    console.log("🔄 Recalculando saldos dos bancos...");
-    console.log("📊 Total de itens disponíveis:", allItems.length);
-    console.log("📅 Itens do período atual:", periodItems.length);
+    console.log("🔄 Recalculando saldos dos bancos para o período atual...");
+    console.log("📊 Total de itens do período:", periodItems.length);
     
     return availableBanks.map(bank => {
       // Saldo inicial configurado
@@ -72,36 +71,7 @@ export const useCalculatedBankBalances = (
       console.log(`\n=== Calculando saldo para ${bank} ===`);
       console.log("💰 Saldo inicial configurado:", initialBalance);
       
-      // Filtrar TODOS os lançamentos deste banco (excluindo resumos) até hoje
-      const allBankItems = allItems
-        .filter(item => 
-          item.bank === bank && 
-          item.source !== 'financial_summary' && 
-          item.source !== 'financial_summary_income'
-        )
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Ordenar por data crescente
-      
-      console.log("📋 Lançamentos históricos deste banco:", allBankItems.length);
-      if (allBankItems.length > 0) {
-        console.log("📅 Data mais antiga:", allBankItems[0].date);
-        console.log("📅 Data mais recente:", allBankItems[allBankItems.length - 1].date);
-      }
-      
-      // Calcular o saldo atual baseado em TODOS os movimentos históricos
-      const totalHistoricalMovement = allBankItems.reduce((sum, item) => {
-        const amount = item.type === 'entrada' ? item.amount : -item.amount;
-        console.log(`📝 ${item.date} - ${item.type}: ${item.amount} (${amount > 0 ? '+' : ''}${amount})`);
-        return sum + amount;
-      }, 0);
-      
-      console.log("📈 Total de movimentos históricos:", totalHistoricalMovement);
-      
-      // Saldo atual = saldo inicial + todos os movimentos históricos
-      const currentBalance = initialBalance + totalHistoricalMovement;
-      
-      console.log("💵 Saldo atual calculado:", currentBalance);
-      
-      // Para calcular o saldo anterior (início do período), precisamos subtrair apenas os movimentos do período atual
+      // Filtrar apenas os lançamentos deste banco NO PERÍODO ATUAL (excluindo resumos)
       const periodBankItems = periodItems
         .filter(item => 
           item.bank === bank && 
@@ -110,33 +80,27 @@ export const useCalculatedBankBalances = (
         )
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
-      console.log("📋 Lançamentos do período atual:", periodBankItems.length);
+      console.log("📋 Lançamentos do período atual deste banco:", periodBankItems.length);
       
-      let previousBalance;
+      // Calcular movimento do período atual
+      const periodMovement = periodBankItems.reduce((sum, item) => {
+        const amount = item.type === 'entrada' ? item.amount : -item.amount;
+        console.log(`📝 ${item.date} - ${item.type}: ${item.amount} (${amount > 0 ? '+' : ''}${amount})`);
+        return sum + amount;
+      }, 0);
       
-      if (periodBankItems.length === 0) {
-        // Se não há movimentos no período atual, o saldo anterior é igual ao atual
-        previousBalance = currentBalance;
-        console.log("🔄 Nenhum movimento no período, saldo anterior = saldo atual");
-      } else {
-        // Calcular movimento apenas do período atual
-        const periodMovement = periodBankItems.reduce((sum, item) => {
-          const amount = item.type === 'entrada' ? item.amount : -item.amount;
-          console.log(`📝 Período ${item.date} - ${item.type}: ${item.amount} (${amount > 0 ? '+' : ''}${amount})`);
-          return sum + amount;
-        }, 0);
-        
-        console.log("📊 Movimento total do período:", periodMovement);
-        
-        // Saldo anterior = saldo atual - movimento do período atual
-        previousBalance = currentBalance - periodMovement;
-        console.log("⏮️ Saldo anterior (início do período):", previousBalance);
-      }
+      console.log("📊 Movimento total do período:", periodMovement);
+      
+      // Para o período atual:
+      // - Saldo anterior = saldo inicial (sem movimentos do período)
+      // - Saldo atual = saldo inicial + movimentos do período
+      const previousBalance = initialBalance;
+      const currentBalance = initialBalance + periodMovement;
       
       console.log(`✅ Resultado final para ${bank}:`);
-      console.log(`   - Saldo anterior: ${previousBalance}`);
-      console.log(`   - Saldo atual: ${currentBalance}`);
-      console.log(`   - Variação: ${currentBalance - previousBalance}`);
+      console.log(`   - Saldo anterior (inicial): ${previousBalance}`);
+      console.log(`   - Saldo atual (inicial + movimentos): ${currentBalance}`);
+      console.log(`   - Variação do período: ${periodMovement}`);
       
       return {
         name: bank,
