@@ -10,7 +10,7 @@ import BankBalancesSection from "./BankBalancesSection";
 import { FinancialItem } from "@/types/financial";
 
 const CATEGORIES = [
-  "Carro", "Comida", "Contas Mensais", "Entre bancos", "Escritório", 
+  "Apartamento", "Carro", "Comida", "Contas Mensais", "Entre bancos", "Escritório", 
   "Estudos", "Go On Outdoor", "Imposto", "Investimentos", "Lazer e ócio", 
   "Pro-Labore", "Vida esportiva", "Anúncios Online", "Itens Físicos"
 ];
