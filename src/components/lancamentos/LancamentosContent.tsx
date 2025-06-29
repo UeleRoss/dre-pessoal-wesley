@@ -5,6 +5,7 @@ import FinancialItemsList from "@/components/FinancialItemsList";
 import NewEntryModal from "@/components/NewEntryModal";
 import EditEntryModal from "@/components/EditEntryModal";
 import ExportSelectedButton from "@/components/ExportSelectedButton";
+import FilterSummaryCard from "@/components/FilterSummaryCard";
 import BankBalancesSection from "./BankBalancesSection";
 import { FinancialItem } from "@/types/financial";
 
@@ -70,6 +71,17 @@ const LancamentosContent = ({
           onClearFilters={lancamentosState.handleClearFilters}
           categories={CATEGORIES}
           banks={BANKS}
+        />
+      </div>
+
+      {/* Filter Summary Card - Show when filters are active */}
+      <div className="animate-fade-in">
+        <FilterSummaryCard
+          filteredItems={filteredItems}
+          filterType={lancamentosState.filterType}
+          filterCategory={lancamentosState.filterCategory}
+          filterBank={lancamentosState.filterBank}
+          searchTerm={lancamentosState.searchTerm}
         />
       </div>
 
