@@ -4,6 +4,7 @@ import LancamentosFilters from "@/components/LancamentosFilters";
 import FinancialItemsList from "@/components/FinancialItemsList";
 import NewEntryModal from "@/components/NewEntryModal";
 import EditEntryModal from "@/components/EditEntryModal";
+import ExportSelectedButton from "@/components/ExportSelectedButton";
 import BankBalancesSection from "./BankBalancesSection";
 import { FinancialItem } from "@/types/financial";
 
@@ -71,6 +72,18 @@ const LancamentosContent = ({
           banks={BANKS}
         />
       </div>
+
+      {/* Export Selected Button - Show only when items are selected */}
+      {lancamentosState.selectedItems.length > 0 && (
+        <div className="animate-fade-in">
+          <div className="flex justify-end">
+            <ExportSelectedButton
+              selectedItems={lancamentosState.selectedItems}
+              allItems={allItems}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Financial Items List */}
       <div className="animate-fade-in">
