@@ -71,82 +71,66 @@ export const useCalculatedBankBalances = (
       console.log(`\n=== Calculando saldo para ${bank} ===`);
       console.log("💰 Saldo inicial configurado:", initialBalance);
       
-      // *** INVESTIGAÇÃO ESPECIAL PARA C6 BANK ***
+      // Filtrar apenas os lançamentos MANUAIS deste banco NO PERÍODO ATUAL
+      // Excluindo completamente os resumos (financial_summary e financial_summary_income)
+      const periodBankItems = periodItems
+        .filter(item => 
+          item.bank === bank && 
+          (!item.source || item.source === 'manual')
+        )
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      console.log("📋 Lançamentos MANUAIS do período deste banco:", periodBankItems.length);
+      
+      // *** INVESTIGAÇÃO DETALHADA PARA C6 BANK ***
       if (bank === 'C6 BANK') {
-        console.log("🔍 INVESTIGAÇÃO ESPECIAL: C6 BANK");
-        console.log("📋 Todos os itens do período:", periodItems.length);
+        console.log("🔍 INVESTIGAÇÃO DETALHADA: C6 BANK");
+        console.log("📋 Itens manuais encontrados:", periodBankItems.length);
         
-        // Mostrar TODOS os itens do C6 Bank no período
-        const allC6Items = periodItems.filter(item => item.bank === 'C6 BANK');
-        console.log("💳 Total de lançamentos C6 Bank no período:", allC6Items.length);
-        
-        allC6Items.forEach((item, index) => {
-          console.log(`📝 C6 Item ${index + 1}:`, {
+        periodBankItems.forEach((item, index) => {
+          console.log(`📝 C6 Manual Item ${index + 1}:`, {
             date: item.date,
             type: item.type,
             amount: item.amount,
             description: item.description,
-            source: item.source,
-            id: item.id
+            source: item.source || 'manual'
           });
         });
         
-        // Separar por origem
-        const manualItems = allC6Items.filter(item => !item.source || item.source === 'manual');
-        const summaryItems = allC6Items.filter(item => 
-          item.source === 'financial_summary' || 
-          item.source === 'financial_summary_income'
+        // Mostrar também os resumos que FORAM EXCLUÍDOS
+        const excludedSummaries = periodItems.filter(item => 
+          item.bank === 'C6 BANK' && 
+          (item.source === 'financial_summary' || item.source === 'financial_summary_income')
         );
-        
-        console.log("🖊️ Lançamentos manuais C6:", manualItems.length);
-        console.log("📊 Lançamentos de resumo C6:", summaryItems.length);
-        
-        // Calcular valores separadamente
-        const manualMovement = manualItems.reduce((sum, item) => {
-          const amount = item.type === 'entrada' ? item.amount : -item.amount;
-          return sum + amount;
-        }, 0);
-        
-        const summaryMovement = summaryItems.reduce((sum, item) => {
-          const amount = item.type === 'entrada' ? item.amount : -item.amount;
-          return sum + amount;
-        }, 0);
-        
-        console.log("🖊️ Movimento manual C6:", manualMovement);
-        console.log("📊 Movimento resumo C6:", summaryMovement);
-        console.log("📊 Movimento total C6:", manualMovement + summaryMovement);
+        console.log("❌ Resumos EXCLUÍDOS do cálculo:", excludedSummaries.length);
+        excludedSummaries.forEach((item, index) => {
+          console.log(`❌ Resumo excluído ${index + 1}:`, {
+            date: item.date,
+            type: item.type,
+            amount: item.amount,
+            description: item.description,
+            source: item.source
+          });
+        });
       }
       
-      // Filtrar apenas os lançamentos deste banco NO PERÍODO ATUAL (excluindo resumos)
-      const periodBankItems = periodItems
-        .filter(item => 
-          item.bank === bank && 
-          item.source !== 'financial_summary' && 
-          item.source !== 'financial_summary_income'
-        )
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      
-      console.log("📋 Lançamentos do período atual deste banco:", periodBankItems.length);
-      
-      // Calcular movimento do período atual
+      // Calcular movimento do período atual (apenas lançamentos manuais)
       const periodMovement = periodBankItems.reduce((sum, item) => {
         const amount = item.type === 'entrada' ? item.amount : -item.amount;
         console.log(`📝 ${item.date} - ${item.type}: ${item.amount} (${amount > 0 ? '+' : ''}${amount})`);
         return sum + amount;
       }, 0);
       
-      console.log("📊 Movimento total do período:", periodMovement);
+      console.log("📊 Movimento total do período (apenas manuais):", periodMovement);
       
-      // Para o período atual:
-      // - Saldo anterior = saldo inicial (sem movimentos do período)
-      // - Saldo atual = saldo inicial + movimentos do período
+      // Saldo atual = saldo inicial + movimentos manuais do período
       const previousBalance = initialBalance;
       const currentBalance = initialBalance + periodMovement;
       
       console.log(`✅ Resultado final para ${bank}:`);
-      console.log(`   - Saldo anterior (inicial): ${previousBalance}`);
-      console.log(`   - Saldo atual (inicial + movimentos): ${currentBalance}`);
-      console.log(`   - Variação do período: ${periodMovement}`);
+      console.log(`   - Saldo inicial: ${previousBalance}`);
+      console.log(`   - Movimento manual do período: ${periodMovement}`);
+      console.log(`   - Saldo atual: ${currentBalance}`);
       
       return {
         name: bank,
