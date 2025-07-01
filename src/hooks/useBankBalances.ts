@@ -71,6 +71,52 @@ export const useCalculatedBankBalances = (
       console.log(`\n=== Calculando saldo para ${bank} ===`);
       console.log("💰 Saldo inicial configurado:", initialBalance);
       
+      // *** INVESTIGAÇÃO ESPECIAL PARA C6 BANK ***
+      if (bank === 'C6 BANK') {
+        console.log("🔍 INVESTIGAÇÃO ESPECIAL: C6 BANK");
+        console.log("📋 Todos os itens do período:", periodItems.length);
+        
+        // Mostrar TODOS os itens do C6 Bank no período
+        const allC6Items = periodItems.filter(item => item.bank === 'C6 BANK');
+        console.log("💳 Total de lançamentos C6 Bank no período:", allC6Items.length);
+        
+        allC6Items.forEach((item, index) => {
+          console.log(`📝 C6 Item ${index + 1}:`, {
+            date: item.date,
+            type: item.type,
+            amount: item.amount,
+            description: item.description,
+            source: item.source,
+            id: item.id
+          });
+        });
+        
+        // Separar por origem
+        const manualItems = allC6Items.filter(item => !item.source || item.source === 'manual');
+        const summaryItems = allC6Items.filter(item => 
+          item.source === 'financial_summary' || 
+          item.source === 'financial_summary_income'
+        );
+        
+        console.log("🖊️ Lançamentos manuais C6:", manualItems.length);
+        console.log("📊 Lançamentos de resumo C6:", summaryItems.length);
+        
+        // Calcular valores separadamente
+        const manualMovement = manualItems.reduce((sum, item) => {
+          const amount = item.type === 'entrada' ? item.amount : -item.amount;
+          return sum + amount;
+        }, 0);
+        
+        const summaryMovement = summaryItems.reduce((sum, item) => {
+          const amount = item.type === 'entrada' ? item.amount : -item.amount;
+          return sum + amount;
+        }, 0);
+        
+        console.log("🖊️ Movimento manual C6:", manualMovement);
+        console.log("📊 Movimento resumo C6:", summaryMovement);
+        console.log("📊 Movimento total C6:", manualMovement + summaryMovement);
+      }
+      
       // Filtrar apenas os lançamentos deste banco NO PERÍODO ATUAL (excluindo resumos)
       const periodBankItems = periodItems
         .filter(item => 
