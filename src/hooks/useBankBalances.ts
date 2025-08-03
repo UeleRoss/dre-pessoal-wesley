@@ -72,10 +72,13 @@ export const useCalculatedBankBalances = (
       console.log("💰 Saldo base configurado:", baseBalance);
       
       // Movimentos do período atual para calcular o saldo atual
+      // Apenas considerar movimentos a partir de hoje
+      const today = new Date().toISOString().split('T')[0];
       const currentPeriodMovements = periodItems
         .filter(item => 
           item.bank === bank && 
-          (!item.source || item.source === 'manual')
+          (!item.source || item.source === 'manual') &&
+          item.date >= today // Só movimentos de hoje em diante
         )
         .reduce((sum, item) => {
           const amount = item.type === 'entrada' ? item.amount : -item.amount;
