@@ -61,34 +61,17 @@ export const useCalculatedBankBalances = (
   selectedMonth: Date
 ) => {
   return useMemo(() => {
-    console.log("🔄 Recalculando saldos dos bancos mantendo saldo acumulado...");
+    console.log("🔄 Calculando saldos dos bancos para o período atual...");
     
     return availableBanks.map(bank => {
-      // Saldo inicial configurado
+      // Saldo inicial configurado (este É o saldo atual real)
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
-      const initialBalance = bankConfig?.initial_balance || 0;
+      const currentBalance = bankConfig?.initial_balance || 0;
       
-      console.log(`\n=== Calculando saldo acumulado para ${bank} ===`);
-      console.log("💰 Saldo inicial configurado:", initialBalance);
+      console.log(`\n=== Calculando saldo para ${bank} ===`);
+      console.log("💰 Saldo atual real:", currentBalance);
       
-      // Calcular todos os movimentos manuais até o final do mês ANTERIOR ao selecionado
-      const previousMonthEnd = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 0);
-      
-      const previousMovements = allItems
-        .filter(item => 
-          item.bank === bank && 
-          (!item.source || item.source === 'manual') &&
-          new Date(item.date) <= previousMonthEnd
-        )
-        .reduce((sum, item) => {
-          const amount = item.type === 'entrada' ? item.amount : -item.amount;
-          return sum + amount;
-        }, 0);
-      
-      // Saldo que "sobrou" do período anterior
-      const previousBalance = initialBalance + previousMovements;
-      
-      // Movimentos do período atual
+      // Movimentos apenas do período atual para mostrar a variação
       const currentPeriodMovements = periodItems
         .filter(item => 
           item.bank === bank && 
@@ -99,12 +82,10 @@ export const useCalculatedBankBalances = (
           return sum + amount;
         }, 0);
       
-      // Saldo atual = saldo anterior + movimentos do período atual
-      const currentBalance = previousBalance + currentPeriodMovements;
+      // O saldo anterior é o saldo atual menos os movimentos do período
+      const previousBalance = currentBalance - currentPeriodMovements;
       
-      console.log(`✅ Resultado final para ${bank}:`);
-      console.log(`   - Saldo inicial: ${initialBalance}`);
-      console.log(`   - Movimentos anteriores: ${previousMovements}`);
+      console.log(`✅ Resultado para ${bank}:`);
       console.log(`   - Saldo anterior: ${previousBalance}`);
       console.log(`   - Movimentos do período: ${currentPeriodMovements}`);
       console.log(`   - Saldo atual: ${currentBalance}`);
