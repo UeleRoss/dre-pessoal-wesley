@@ -455,8 +455,11 @@ export const useContasLogic = (selectedMonth: Date) => {
     
     const currentBalances = calculateCurrentBalances();
     
-    // Considerar todos os bancos do usuário para cálculos
-    const totalCash = Object.values(currentBalances).reduce((sum, balance) => sum + balance, 0);
+    // Considerar apenas C6 BANK e ASAAS para cálculo do saldo restante
+    const allowedBanks = ['C6 BANK', 'ASAAS'];
+    const totalCash = Object.entries(currentBalances)
+      .filter(([bankName]) => allowedBanks.includes(bankName))
+      .reduce((sum, [, balance]) => sum + balance, 0);
     
     return {
       totalBills,
