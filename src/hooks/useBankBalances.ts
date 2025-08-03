@@ -47,38 +47,6 @@ export const useBankBalances = (user: any) => {
     enabled: !!user?.id
   });
 
-  // Função para corrigir o saldo do C6 BANK
-  const correctC6BankBalance = async () => {
-    if (!user?.id) return;
-    
-    console.log("🔧 Corrigindo saldo do C6 BANK para valor real de R$ 1.615,17");
-    
-    const { error } = await supabase
-      .from('bank_balances')
-      .update({ 
-        initial_balance: 2701.24,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', user.id)
-      .eq('bank_name', 'C6 BANK');
-    
-    if (error) {
-      console.error("❌ Erro ao corrigir saldo do C6 BANK:", error);
-    } else {
-      console.log("✅ Saldo do C6 BANK corrigido com sucesso!");
-      // Invalidar as queries para recarregar os dados
-      window.location.reload();
-    }
-  };
-
-  // Executar a correção automaticamente
-  if (user?.id && bankBalances.length > 0) {
-    const c6Bank = bankBalances.find(b => b.bank_name === 'C6 BANK');
-    if (c6Bank && c6Bank.initial_balance !== 2701.24) {
-      correctC6BankBalance();
-    }
-  }
-
   return {
     bankBalances,
     availableBanks
