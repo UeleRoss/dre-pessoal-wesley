@@ -7,7 +7,7 @@ import { FinancialItem } from "@/types/financial";
 export const useBankBalances = (user: any) => {
   // Buscar saldos iniciais dos bancos
   const { data: bankBalances = [] } = useQuery({
-    queryKey: ['bank-balances'],
+    queryKey: ['bank-balances', user?.id],
     queryFn: async () => {
       if (!user) return [];
       
