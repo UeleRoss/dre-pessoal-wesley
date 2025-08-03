@@ -66,6 +66,7 @@ const LancamentosContainer = () => {
           allItems={allItems}
           bankBalances={bankBalances}
           availableBanks={availableBanks}
+          selectedMonth={selectedMonth}
           refetch={refetch}
           lancamentosState={lancamentosState}
           financialItemActions={financialItemActions}

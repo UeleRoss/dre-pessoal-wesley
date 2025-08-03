@@ -23,6 +23,7 @@ interface LancamentosContentProps {
   allItems: FinancialItem[];
   bankBalances: any[];
   availableBanks: string[];
+  selectedMonth: Date;
   refetch: () => void;
   lancamentosState: any;
   financialItemActions: any;
@@ -34,6 +35,7 @@ const LancamentosContent = ({
   allItems,
   bankBalances,
   availableBanks,
+  selectedMonth,
   refetch,
   lancamentosState,
   financialItemActions
@@ -54,6 +56,7 @@ const LancamentosContent = ({
           availableBanks={availableBanks}
           allItems={allItems}
           periodItems={financialItems}
+          selectedMonth={selectedMonth}
         />
       </div>
 

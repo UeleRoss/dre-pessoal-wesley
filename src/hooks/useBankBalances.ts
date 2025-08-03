@@ -89,47 +89,56 @@ export const useCalculatedBankBalances = (
   availableBanks: string[],
   bankBalances: any[],
   allItems: FinancialItem[],
-  periodItems: FinancialItem[]
+  periodItems: FinancialItem[],
+  selectedMonth: Date
 ) => {
   return useMemo(() => {
-    console.log("🔄 Recalculando saldos dos bancos para o período atual...");
-    console.log("📊 Total de itens do período:", periodItems.length);
+    console.log("🔄 Recalculando saldos dos bancos mantendo saldo acumulado...");
     
     return availableBanks.map(bank => {
       // Saldo inicial configurado
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
       const initialBalance = bankConfig?.initial_balance || 0;
       
-      console.log(`\n=== Calculando saldo para ${bank} ===`);
+      console.log(`\n=== Calculando saldo acumulado para ${bank} ===`);
       console.log("💰 Saldo inicial configurado:", initialBalance);
       
-      // Filtrar apenas os lançamentos MANUAIS deste banco NO PERÍODO ATUAL
-      // Excluindo completamente os resumos (financial_summary e financial_summary_income)
-      const periodBankItems = periodItems
+      // Calcular todos os movimentos manuais até o final do mês ANTERIOR ao selecionado
+      const previousMonthEnd = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 0);
+      
+      const previousMovements = allItems
+        .filter(item => 
+          item.bank === bank && 
+          (!item.source || item.source === 'manual') &&
+          new Date(item.date) <= previousMonthEnd
+        )
+        .reduce((sum, item) => {
+          const amount = item.type === 'entrada' ? item.amount : -item.amount;
+          return sum + amount;
+        }, 0);
+      
+      // Saldo que "sobrou" do período anterior
+      const previousBalance = initialBalance + previousMovements;
+      
+      // Movimentos do período atual
+      const currentPeriodMovements = periodItems
         .filter(item => 
           item.bank === bank && 
           (!item.source || item.source === 'manual')
         )
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        .reduce((sum, item) => {
+          const amount = item.type === 'entrada' ? item.amount : -item.amount;
+          return sum + amount;
+        }, 0);
       
-      console.log("📋 Lançamentos MANUAIS do período deste banco:", periodBankItems.length);
-      
-      // Calcular movimento do período atual (apenas lançamentos manuais)
-      const periodMovement = periodBankItems.reduce((sum, item) => {
-        const amount = item.type === 'entrada' ? item.amount : -item.amount;
-        console.log(`📝 ${item.date} - ${item.type}: ${item.amount} (${amount > 0 ? '+' : ''}${amount})`);
-        return sum + amount;
-      }, 0);
-      
-      console.log("📊 Movimento total do período (apenas manuais):", periodMovement);
-      
-      // Saldo atual = saldo inicial + movimentos manuais do período
-      const previousBalance = initialBalance;
-      const currentBalance = initialBalance + periodMovement;
+      // Saldo atual = saldo anterior + movimentos do período atual
+      const currentBalance = previousBalance + currentPeriodMovements;
       
       console.log(`✅ Resultado final para ${bank}:`);
-      console.log(`   - Saldo inicial: ${previousBalance}`);
-      console.log(`   - Movimento manual do período: ${periodMovement}`);
+      console.log(`   - Saldo inicial: ${initialBalance}`);
+      console.log(`   - Movimentos anteriores: ${previousMovements}`);
+      console.log(`   - Saldo anterior: ${previousBalance}`);
+      console.log(`   - Movimentos do período: ${currentPeriodMovements}`);
       console.log(`   - Saldo atual: ${currentBalance}`);
       
       return {
@@ -138,5 +147,5 @@ export const useCalculatedBankBalances = (
         previousBalance: previousBalance
       };
     });
-  }, [availableBanks, bankBalances, allItems, periodItems]);
+  }, [availableBanks, bankBalances, allItems, periodItems, selectedMonth]);
 };

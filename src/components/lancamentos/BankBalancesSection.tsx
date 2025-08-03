@@ -12,13 +12,15 @@ interface BankBalancesSectionProps {
   availableBanks: string[];
   allItems: FinancialItem[];
   periodItems: FinancialItem[];
+  selectedMonth: Date;
 }
 
 const BankBalancesSection = ({
   bankBalances,
   availableBanks,
   allItems,
-  periodItems
+  periodItems,
+  selectedMonth
 }: BankBalancesSectionProps) => {
   const [showBankSetup, setShowBankSetup] = useState(false);
   
@@ -26,7 +28,8 @@ const BankBalancesSection = ({
     availableBanks,
     bankBalances,
     allItems,
-    periodItems
+    periodItems,
+    selectedMonth
   );
 
   return (
