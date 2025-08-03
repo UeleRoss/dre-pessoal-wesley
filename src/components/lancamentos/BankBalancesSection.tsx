@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import BankCard from "@/components/BankCard";
 import BankBalanceManager from "@/components/BankBalanceManager";
-import { useCalculatedBankBalances } from "@/hooks/useBankBalances";
+import { useBankBalancesCalculations } from "@/hooks/useBankBalancesCalculations";
 import { FinancialItem } from "@/types/financial";
 
 interface BankBalancesSectionProps {
@@ -24,7 +24,7 @@ const BankBalancesSection = ({
 }: BankBalancesSectionProps) => {
   const [showBankSetup, setShowBankSetup] = useState(false);
   
-  const calculatedBankBalances = useCalculatedBankBalances(
+  const calculatedBankBalances = useBankBalancesCalculations(
     availableBanks,
     bankBalances,
     allItems,
