@@ -2,7 +2,7 @@
 import Auth from "@/components/Auth";
 import ContasSummaryCards from "@/components/contas/ContasSummaryCards";
 import BillsList from "@/components/contas/BillsList";
-import BankBalancesCard from "@/components/contas/BankBalancesCard";
+
 import NewBillButton from "@/components/contas/NewBillButton";
 import EditBillModal from "@/components/contas/EditBillModal";
 import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
@@ -136,10 +136,6 @@ const Contas = () => {
         onAdjustValue={handleAdjustValue}
       />
 
-      <BankBalancesCard
-        currentBalances={currentBalances}
-        bills={bills}
-      />
 
       {/* Nova seção para cobranças do cartão de crédito */}
       <CreditCardChargesSection />

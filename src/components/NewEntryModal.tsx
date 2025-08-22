@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentBrazilDate } from "@/utils/dateUtils";
 import { Pencil } from "lucide-react";
-import { useUserBanks } from "@/hooks/useUserBanks";
+
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -66,8 +66,24 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Usar o hook personalizado para bancos
-  const { allUserBanks } = useUserBanks();
+  // Buscar bancos do usuário via query direta
+  const { data: allUserBanks = [] } = useQuery({
+    queryKey: ['user-banks', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('bank')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const uniqueBanks = [...new Set(data.map(item => item.bank))].filter(Boolean);
+      return uniqueBanks.sort();
+    },
+    enabled: !!user?.id
+  });
 
   // Buscar usuário atual
   useEffect(() => {

@@ -6,7 +6,7 @@ import NewEntryModal from "@/components/NewEntryModal";
 import EditEntryModal from "@/components/EditEntryModal";
 import ExportSelectedButton from "@/components/ExportSelectedButton";
 import FilterSummaryCard from "@/components/FilterSummaryCard";
-import BankBalancesSection from "./BankBalancesSection";
+
 import { FinancialItem } from "@/types/financial";
 
 const CATEGORIES = [
@@ -21,8 +21,6 @@ interface LancamentosContentProps {
   user: any;
   financialItems: FinancialItem[];
   allItems: FinancialItem[];
-  bankBalances: any[];
-  availableBanks: string[];
   selectedMonth: Date;
   refetch: () => void;
   lancamentosState: any;
@@ -33,8 +31,6 @@ const LancamentosContent = ({
   user,
   financialItems,
   allItems,
-  bankBalances,
-  availableBanks,
   selectedMonth,
   refetch,
   lancamentosState,
@@ -49,16 +45,6 @@ const LancamentosContent = ({
         <FinancialSummaryCards items={financialItems} />
       </div>
 
-      {/* Bank Balances Section */}
-      <div className="animate-fade-in">
-        <BankBalancesSection
-          bankBalances={bankBalances}
-          availableBanks={availableBanks}
-          allItems={allItems}
-          periodItems={financialItems}
-          selectedMonth={selectedMonth}
-        />
-      </div>
 
       {/* Filters */}
       <div className="animate-fade-in">

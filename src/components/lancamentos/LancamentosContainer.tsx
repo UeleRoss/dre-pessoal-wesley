@@ -4,7 +4,7 @@ import Auth from "@/components/Auth";
 import { useFinancialData } from "@/hooks/useFinancialData";
 import { useLancamentosState } from "@/hooks/useLancamentosState";
 import { useFinancialItemActions } from "@/components/FinancialItemActions";
-import { useBankBalances } from "@/hooks/useBankBalances";
+
 import LancamentosHeader from "./LancamentosHeader";
 import LancamentosContent from "./LancamentosContent";
 
@@ -30,7 +30,7 @@ const LancamentosContainer = () => {
     selectedItems: lancamentosState.selectedItems
   });
 
-  const { bankBalances, availableBanks } = useBankBalances(user);
+  
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -64,8 +64,6 @@ const LancamentosContainer = () => {
           user={user}
           financialItems={financialItems}
           allItems={allItems}
-          bankBalances={bankBalances}
-          availableBanks={availableBanks}
           selectedMonth={selectedMonth}
           refetch={refetch}
           lancamentosState={lancamentosState}
