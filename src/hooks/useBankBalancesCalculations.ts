@@ -9,24 +9,23 @@ export const useBankBalancesCalculations = (
   selectedMonth: Date
 ) => {
   return useMemo(() => {
-    console.log("🔄 Calculando saldos dos bancos com movimentos do período...");
+    console.log("🔄 Calculando saldos atuais dos bancos...");
     
     return availableBanks.map(bank => {
-      // Saldo base configurado (valor real do início do período)
+      // Saldo base configurado
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
       const baseBalance = bankConfig?.initial_balance || 0;
       
       console.log(`\n=== Calculando saldo para ${bank} ===`);
-      console.log("💰 Saldo base configurado:", baseBalance);
+      console.log("💰 Saldo inicial configurado:", baseBalance);
       
-      // Movimentos do período atual para calcular o saldo atual
-      // Apenas considerar movimentos a partir de hoje
+      // Calcular todas as movimentações até hoje para obter o saldo atual real
       const today = new Date().toISOString().split('T')[0];
-      const currentPeriodMovements = periodItems
+      const allMovements = allItems
         .filter(item => 
           item.bank === bank && 
           (!item.source || item.source === 'manual') &&
-          item.date >= today // Só movimentos de hoje em diante
+          item.date <= today // Todas as movimentações até hoje
         )
         .reduce((sum, item) => {
           const amount = item.type === 'entrada' ? item.amount : -item.amount;
@@ -34,12 +33,12 @@ export const useBankBalancesCalculations = (
           return sum + amount;
         }, 0);
       
-      // Saldo atual = saldo base + movimentos do período
-      const currentBalance = baseBalance + currentPeriodMovements;
+      // Saldo atual = saldo inicial + todas as movimentações até hoje
+      const currentBalance = baseBalance + allMovements;
       
       console.log(`✅ Resultado para ${bank}:`);
-      console.log(`   - Saldo base: ${baseBalance}`);
-      console.log(`   - Movimentos do período: ${currentPeriodMovements}`);
+      console.log(`   - Saldo inicial: ${baseBalance}`);
+      console.log(`   - Total de movimentações: ${allMovements}`);
       console.log(`   - Saldo atual: ${currentBalance}`);
       
       return {
@@ -48,5 +47,5 @@ export const useBankBalancesCalculations = (
         previousBalance: baseBalance
       };
     });
-  }, [availableBanks, bankBalances, allItems, periodItems, selectedMonth]);
+  }, [availableBanks, bankBalances, allItems, selectedMonth]);
 };
