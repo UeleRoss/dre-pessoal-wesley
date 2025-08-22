@@ -21,24 +21,28 @@ export const useBankBalancesCalculations = (
       
       // Calcular todas as movimentações até hoje para obter o saldo atual real
       const today = new Date().toISOString().split('T')[0];
-      const allMovements = allItems
+      const baselineDate = bankConfig?.updated_at
+        ? new Date(bankConfig.updated_at).toISOString().split('T')[0]
+        : '1970-01-01';
+      const movementsSinceBaseline = allItems
         .filter(item => 
           item.bank === bank && 
           (!item.source || item.source === 'manual') &&
-          item.date <= today // Todas as movimentações até hoje
+          item.date > baselineDate && // Somente movimentações após o último ajuste de saldo
+          item.date <= today // E até hoje
         )
         .reduce((sum, item) => {
-          const amount = item.type === 'entrada' ? item.amount : -item.amount;
+          const amount = item.type === 'entrada' ? Number(item.amount) : -Number(item.amount);
           console.log(`📝 ${item.date} - ${item.type}: ${item.amount} (${amount > 0 ? '+' : ''}${amount})`);
           return sum + amount;
         }, 0);
       
-      // Saldo atual = saldo inicial + todas as movimentações até hoje
-      const currentBalance = baseBalance + allMovements;
+      // Saldo atual = saldo inicial (no momento do ajuste) + movimentações após o ajuste
+      const currentBalance = Number(baseBalance) + movementsSinceBaseline;
       
       console.log(`✅ Resultado para ${bank}:`);
-      console.log(`   - Saldo inicial: ${baseBalance}`);
-      console.log(`   - Total de movimentações: ${allMovements}`);
+      console.log(`   - Saldo inicial (no ajuste): ${baseBalance}`);
+      console.log(`   - Movimentações desde ${baselineDate}: ${movementsSinceBaseline}`);
       console.log(`   - Saldo atual: ${currentBalance}`);
       
       return {

@@ -47,6 +47,23 @@ export const useContasCalculations = (
     enabled: !!user?.id
   });
 
+  // Buscar todos os lançamentos do usuário (para saldo real independente do mês)
+  const { data: allItems = [] } = useQuery({
+    queryKey: ['all-items-contas', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('financial_items')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
   // Calcular saldos atuais dos bancos
   const calculateCurrentBalances = () => {
     const balances: Record<string, number> = {};
@@ -54,14 +71,24 @@ export const useContasCalculations = (
     userBanks.forEach(bank => {
       const bankConfig = bankBalances.find(b => b.bank_name === bank);
       const initialBalance = bankConfig?.initial_balance || 0;
+      const baselineDate = bankConfig?.updated_at
+        ? new Date(bankConfig.updated_at).toISOString().split('T')[0]
+        : '1970-01-01';
+      const today = new Date().toISOString().split('T')[0];
       
-      const bankMovements = monthlyItems
-        .filter(item => item.bank === bank)
+      const bankMovements = allItems
+        .filter(item => 
+          item.bank === bank &&
+          (!item.source || item.source === 'manual') &&
+          item.date > baselineDate &&
+          item.date <= today
+        )
         .reduce((sum, item) => {
-          return item.type === 'entrada' ? sum + Number(item.amount) : sum - Number(item.amount);
+          const amount = item.type === 'entrada' ? Number(item.amount) : -Number(item.amount);
+          return sum + amount;
         }, 0);
       
-      balances[bank] = initialBalance + bankMovements;
+      balances[bank] = Number(initialBalance) + bankMovements;
     });
     
     return balances;
