@@ -88,29 +88,57 @@ const Auth = ({ onAuthChange }: AuthProps) => {
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Senha</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-2 border rounded-lg"
-                required
-                minLength={6}
-              />
-            </div>
+            {!isResetPassword && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Senha</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-2 border rounded-lg"
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
+              {loading ? "Carregando..." : 
+               isResetPassword ? "Enviar email de recuperação" :
+               isLogin ? "Entrar" : "Criar Conta"}
             </Button>
           </form>
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              {isLogin ? "Não tem conta? Criar uma" : "Já tem conta? Entrar"}
-            </button>
+          <div className="mt-4 text-center space-y-2">
+            {!isResetPassword ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-sm text-blue-600 hover:underline block"
+                >
+                  {isLogin ? "Não tem conta? Criar uma" : "Já tem conta? Entrar"}
+                </button>
+                {isLogin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsResetPassword(true)}
+                    className="text-sm text-blue-600 hover:underline block"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetPassword(false);
+                  setIsLogin(true);
+                }}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Voltar ao login
+              </button>
+            )}
           </div>
         </CardContent>
       </Card>
