@@ -13,6 +13,7 @@ const Auth = ({ onAuthChange }: AuthProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -21,7 +22,17 @@ const Auth = ({ onAuthChange }: AuthProps) => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (isResetPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/`,
+        });
+        if (error) throw error;
+        toast({
+          title: "Email de recuperação enviado!",
+          description: "Verifique sua caixa de entrada para redefinir sua senha.",
+        });
+        setIsResetPassword(false);
+      } else if (isLogin) {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -36,6 +47,9 @@ const Auth = ({ onAuthChange }: AuthProps) => {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
         });
         if (error) throw error;
         toast({
@@ -59,7 +73,7 @@ const Auth = ({ onAuthChange }: AuthProps) => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center">
-            {isLogin ? "Entrar" : "Criar Conta"}
+            {isResetPassword ? "Recuperar Senha" : isLogin ? "Entrar" : "Criar Conta"}
           </CardTitle>
         </CardHeader>
         <CardContent>
