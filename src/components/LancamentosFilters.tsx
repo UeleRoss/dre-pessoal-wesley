@@ -32,17 +32,20 @@ const LancamentosFilters = ({
   banks
 }: LancamentosFiltersProps) => {
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Input
-          type="text"
-          placeholder="Buscar por descrição..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-        
+    <div className="bg-white rounded-xl shadow-lg p-4 md:p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+        <div className="sm:col-span-2 md:col-span-1">
+          <Input
+            type="text"
+            placeholder="Buscar por descrição..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full"
+          />
+        </div>
+
         <Select value={filterType} onValueChange={onTypeChange}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Filtrar por tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -51,9 +54,9 @@ const LancamentosFilters = ({
             <SelectItem value="saida">Saída</SelectItem>
           </SelectContent>
         </Select>
-        
+
         <Select value={filterCategory} onValueChange={onCategoryChange}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Filtrar por categoria" />
           </SelectTrigger>
           <SelectContent>
@@ -65,7 +68,7 @@ const LancamentosFilters = ({
         </Select>
 
         <Select value={filterBank} onValueChange={onBankChange}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Filtrar por banco" />
           </SelectTrigger>
           <SelectContent>
@@ -75,11 +78,13 @@ const LancamentosFilters = ({
             ))}
           </SelectContent>
         </Select>
-        
-        <Button variant="outline" onClick={onClearFilters}>
-          <Filter className="h-4 w-4 mr-2" />
-          Limpar Filtros
-        </Button>
+
+        <div className="sm:col-span-2 md:col-span-1">
+          <Button variant="outline" onClick={onClearFilters} className="w-full">
+            <Filter className="h-4 w-4 mr-2" />
+            Limpar Filtros
+          </Button>
+        </div>
       </div>
     </div>
   );

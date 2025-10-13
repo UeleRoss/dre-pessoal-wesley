@@ -32,11 +32,11 @@ const BusinessUnitsNav = ({ onSelectUnit }: BusinessUnitsNavProps) => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm border border-blue-100 p-4">
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
-        <div className="flex items-center gap-2 text-sm text-blue-900 mr-3 whitespace-nowrap">
-          <Building2 className="h-5 w-5 text-blue-600" />
-          <span className="font-semibold">Unidades:</span>
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm border border-blue-100 p-3 md:p-4">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 -mb-2 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-100">
+        <div className="flex items-center gap-2 text-xs md:text-sm text-blue-900 mr-2 md:mr-3 whitespace-nowrap flex-shrink-0">
+          <Building2 className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+          <span className="font-semibold hidden sm:inline">Unidades:</span>
         </div>
 
         <Button
@@ -44,7 +44,7 @@ const BusinessUnitsNav = ({ onSelectUnit }: BusinessUnitsNavProps) => {
           variant={selectedUnitId === null ? "default" : "outline"}
           onClick={() => handleSelectUnit(null)}
           className={cn(
-            "whitespace-nowrap font-medium",
+            "whitespace-nowrap font-medium text-xs md:text-sm h-8 md:h-9 px-3 md:px-4 flex-shrink-0",
             selectedUnitId === null && "shadow-md"
           )}
         >
@@ -58,7 +58,7 @@ const BusinessUnitsNav = ({ onSelectUnit }: BusinessUnitsNavProps) => {
             variant={selectedUnitId === unit.id ? "default" : "outline"}
             onClick={() => handleSelectUnit(unit.id)}
             className={cn(
-              "whitespace-nowrap flex items-center gap-2 font-medium transition-all",
+              "whitespace-nowrap flex items-center gap-1.5 md:gap-2 font-medium transition-all text-xs md:text-sm h-8 md:h-9 px-3 md:px-4 flex-shrink-0",
               selectedUnitId === unit.id && "shadow-md scale-105"
             )}
             style={{
@@ -71,7 +71,7 @@ const BusinessUnitsNav = ({ onSelectUnit }: BusinessUnitsNavProps) => {
           >
             <div
               className={cn(
-                "w-3 h-3 rounded-full",
+                "w-2.5 h-2.5 md:w-3 md:h-3 rounded-full",
                 selectedUnitId !== unit.id && "border-2"
               )}
               style={{

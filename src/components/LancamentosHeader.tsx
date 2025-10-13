@@ -21,10 +21,10 @@ const LancamentosHeader = ({
   onPeriodTypeChange,
 }: LancamentosHeaderProps) => {
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4 mb-4 md:mb-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Lançamentos Financeiros</h1>
-        <p className="text-gray-600 mt-1">Gerencie suas entradas e saídas</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Lançamentos Financeiros</h1>
+        <p className="text-sm md:text-base text-gray-600 mt-1">Gerencie suas entradas e saídas</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -35,9 +35,10 @@ const LancamentosHeader = ({
           onPeriodTypeChange={onPeriodTypeChange}
         />
 
-        <Button onClick={onNewEntry}>
+        <Button onClick={onNewEntry} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
-          Novo Lançamento
+          <span className="hidden sm:inline">Novo Lançamento</span>
+          <span className="sm:hidden">Novo</span>
         </Button>
       </div>
     </div>

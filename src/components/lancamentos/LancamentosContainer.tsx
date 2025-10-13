@@ -50,7 +50,7 @@ const LancamentosContainer = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
         <LancamentosHeader
           onNewEntry={() => lancamentosState.setShowNewEntryModal(true)}
           selectedMonth={selectedMonth}

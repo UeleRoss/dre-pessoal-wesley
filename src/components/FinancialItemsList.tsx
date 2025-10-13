@@ -71,33 +71,34 @@ const FinancialItemsList = ({
   
   return (
     <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Lançamentos Financeiros</CardTitle>
+      <CardHeader className="p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <CardTitle className="text-base md:text-lg">Lançamentos Financeiros</CardTitle>
           {selectedItems.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs md:text-sm text-gray-600">
                 {selectedItems.length} selecionado{selectedItems.length > 1 ? 's' : ''}
               </span>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Deletar Selecionados
+                  <Button variant="destructive" size="sm" className="flex-1 sm:flex-none text-xs md:text-sm h-8 md:h-9">
+                    <Trash2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+                    <span className="hidden sm:inline">Deletar Selecionados</span>
+                    <span className="sm:hidden">Deletar</span>
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[90vw] md:max-w-md">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir Lançamentos</AlertDialogTitle>
-                    <AlertDialogDescription>
+                    <AlertDialogTitle className="text-base md:text-lg">Excluir Lançamentos</AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm">
                       Tem certeza que deseja excluir {selectedItems.length} lançamento{selectedItems.length > 1 ? 's' : ''}? Esta ação não pode ser desfeita.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
+                  <AlertDialogFooter className="flex-col md:flex-row gap-2">
+                    <AlertDialogCancel className="w-full md:w-auto">Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
                       onClick={onDeleteSelected}
-                      className="bg-red-600 hover:bg-red-700"
+                      className="bg-red-600 hover:bg-red-700 w-full md:w-auto"
                     >
                       Excluir
                     </AlertDialogAction>
@@ -108,11 +109,11 @@ const FinancialItemsList = ({
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 md:p-6">
         {filteredItems.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p className="text-lg font-medium">Nenhum lançamento encontrado</p>
-            <p className="text-sm">
+          <div className="text-center py-6 md:py-8 text-gray-500">
+            <p className="text-base md:text-lg font-medium">Nenhum lançamento encontrado</p>
+            <p className="text-xs md:text-sm mt-1">
               {searchTerm || filterType !== "all" || filterCategory !== "all" || filterBank !== "all"
                 ? "Tente ajustar os filtros para ver mais resultados"
                 : "Adicione seu primeiro lançamento financeiro"
@@ -120,7 +121,7 @@ const FinancialItemsList = ({
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             <SelectionControls
               selectedItems={selectedItems}
               filteredItems={filteredItems}
