@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { useCreditCards } from "@/hooks/useCreditCards";
 import { X, Plus, Trash2, Edit2, Check, CreditCard, Repeat, Calendar } from "lucide-react";
 import { useUnitCategories } from "@/hooks/useUnitCategories";
 import type { TransactionType } from "@/constants/default-categories";
+import type { BusinessUnit } from "@/types/business-unit";
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -32,8 +34,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     is_installment: false,
     total_installments: 1,
   });
-  const [user, setUser] = useState<any>(null);
-  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [newCategory, setNewCategory] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editedCategoryName, setEditedCategoryName] = useState('');
@@ -149,7 +151,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       setEditingCategoryId(null);
       setEditedCategoryName('');
     } catch (error) {
-      // handled by toast
+      // handled pelo hook de toast
     }
   };
 
@@ -160,15 +162,17 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         setFormData((prev) => ({ ...prev, category: '' }));
       }
     } catch (error) {
-      // handled by toast
+      // handled pelo hook de toast
     }
   };
 
   useEffect(() => {
     const getUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setUser(user ?? null);
       } catch (error) {
         console.error("Erro ao buscar usuário:", error);
       }
@@ -185,17 +189,22 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           .select('*')
           .eq('user_id', user.id)
           .order('name');
-        if (!error && data) {
-          setBusinessUnits(data);
-        }
+        if (error) throw error;
+        setBusinessUnits(data ?? []);
       } catch (error) {
-        console.error('Erro ao buscar unidades:', error);
+        const message = error instanceof Error ? error.message : 'Erro ao buscar unidades';
+        console.error('Erro ao buscar unidades:', message);
+        toast({
+          title: "Erro ao carregar unidades",
+          description: message,
+          variant: "destructive",
+        });
       }
     };
     if (isOpen && user?.id) {
       fetchBusinessUnits();
     }
-  }, [isOpen, user?.id]);
+  }, [isOpen, user?.id, toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -329,9 +338,10 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
 
       onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error("Erro:", error);
-      toast({ title: "Erro", description: error.message || "Erro ao criar lançamento.", variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao criar lançamento.";
+      console.error("Erro:", message);
+      toast({ title: "Erro", description: message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

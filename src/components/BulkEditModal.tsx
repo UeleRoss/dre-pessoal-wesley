@@ -9,6 +9,7 @@ import { Plus, Trash2, Edit2, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUnitCategories } from "@/hooks/useUnitCategories";
 import type { TransactionType } from "@/constants/default-categories";
+import type { BusinessUnit } from "@/types/business-unit";
 
 interface BulkEditModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ interface BulkEditModalProps {
 const BulkEditModal = ({ isOpen, onClose, onSuccess, selectedItemIds, userId }: BulkEditModalProps) => {
   const [businessUnitId, setBusinessUnitId] = useState<string>('');
   const [category, setCategory] = useState<string>('');
-  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [selectedItemsType, setSelectedItemsType] = useState<string>('');
   const [newCategory, setNewCategory] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -75,11 +76,16 @@ const BulkEditModal = ({ isOpen, onClose, onSuccess, selectedItemIds, userId }: 
           .select('*')
           .eq('user_id', userId)
           .order('name');
-        if (!error && data) {
-          setBusinessUnits(data);
-        }
+        if (error) throw error;
+        setBusinessUnits(data ?? []);
       } catch (error) {
-        console.error('Erro ao buscar unidades:', error);
+        const message = error instanceof Error ? error.message : 'Erro ao buscar unidades';
+        console.error('Erro ao buscar unidades:', message);
+        toast({
+          title: "Erro ao carregar unidades",
+          description: message,
+          variant: "destructive",
+        });
       }
     };
 
@@ -93,11 +99,18 @@ const BulkEditModal = ({ isOpen, onClose, onSuccess, selectedItemIds, userId }: 
           .limit(1)
           .single();
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data?.type) {
           setSelectedItemsType(data.type);
         }
       } catch (error) {
-        console.error('Erro ao buscar tipo dos itens:', error);
+        const message = error instanceof Error ? error.message : 'Erro ao buscar tipo dos itens';
+        console.error('Erro ao buscar tipo dos itens:', message);
+        toast({
+          title: "Erro ao carregar lançamentos",
+          description: message,
+          variant: "destructive",
+        });
       }
     };
 
@@ -105,7 +118,7 @@ const BulkEditModal = ({ isOpen, onClose, onSuccess, selectedItemIds, userId }: 
       fetchBusinessUnits();
       fetchSelectedItemsType();
     }
-  }, [isOpen, userId, selectedItemIds]);
+  }, [isOpen, userId, selectedItemIds, toast]);
 
   useEffect(() => {
     if (!transactionType || !businessUnitId) {
@@ -235,11 +248,12 @@ const BulkEditModal = ({ isOpen, onClose, onSuccess, selectedItemIds, userId }: 
 
       onSuccess();
       handleClose();
-    } catch (error: any) {
-      console.error('Erro ao atualizar lançamentos:', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao atualizar lançamentos";
+      console.error('Erro ao atualizar lançamentos:', message);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao atualizar lançamentos",
+        description: message,
         variant: "destructive",
       });
     } finally {

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Edit2, Check } from "lucide-react";
 import { useUnitCategories } from "@/hooks/useUnitCategories";
 import type { TransactionType } from "@/constants/default-categories";
+import type { BusinessUnit } from "@/types/business-unit";
 
 interface FinancialItem {
   id: string;
@@ -38,7 +39,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   const [category, setCategory] = useState("");
   const [businessUnitId, setBusinessUnitId] = useState<string | null>(null);
   const [date, setDate] = useState("");
-  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [newCategory, setNewCategory] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editedCategoryName, setEditedCategoryName] = useState('');
@@ -110,17 +111,22 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
           .select('*')
           .eq('user_id', userId)
           .order('name');
-        if (!error && data) {
-          setBusinessUnits(data);
-        }
+        if (error) throw error;
+        setBusinessUnits(data ?? []);
       } catch (error) {
-        console.error('Erro ao buscar unidades:', error);
+        const message = error instanceof Error ? error.message : 'Erro ao buscar unidades';
+        console.error('Erro ao buscar unidades:', message);
+        toast({
+          title: "Erro ao carregar unidades",
+          description: message,
+          variant: "destructive",
+        });
       }
     };
     if (isOpen && userId) {
       fetchBusinessUnits();
     }
-  }, [isOpen, userId]);
+  }, [isOpen, userId, toast]);
 
   useEffect(() => {
     if (!showCategoriesSection) {

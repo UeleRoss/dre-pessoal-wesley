@@ -83,11 +83,12 @@ export const useUnitCategories = ({
         window.localStorage.setItem(seedStorageKey, "true");
       }
     },
-    onError: (error: any) => {
-      console.error("Erro ao criar categorias padrão:", error);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Erro ao criar categorias padrão";
+      console.error("Erro ao criar categorias padrão:", message);
       toast({
         title: "Erro ao criar categorias padrão",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -118,10 +119,11 @@ export const useUnitCategories = ({
         description: `"${name}" foi adicionada à unidade.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Erro ao adicionar categoria";
       toast({
         title: "Erro ao adicionar categoria",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -147,10 +149,11 @@ export const useUnitCategories = ({
         description: `Categoria renomeada para "${newName}".`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Erro ao atualizar categoria";
       toast({
         title: "Erro ao atualizar categoria",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -170,10 +173,11 @@ export const useUnitCategories = ({
       });
       return id;
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Erro ao remover categoria";
       toast({
         title: "Erro ao remover categoria",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -214,6 +218,7 @@ export const useUnitCategories = ({
     businessUnitId,
     userId,
     seedDefaultsMutation,
+    seedStorageKey,
   ]);
 
   return {
