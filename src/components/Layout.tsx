@@ -1,19 +1,25 @@
 
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { 
-  Receipt, 
+import {
+  Receipt,
   CreditCard,
   TrendingUp,
-  PiggyBank
+  PiggyBank,
+  BarChart3,
+  Target,
+  LineChart
 } from "lucide-react";
 import UserNameEditor from "./UserNameEditor";
 import { useUserName } from "@/hooks/useUserName";
 
 const navigation = [
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Lançamentos", href: "/lancamentos", icon: Receipt },
   { name: "Contas", href: "/contas", icon: CreditCard },
   { name: "Investimentos", href: "/investimentos", icon: PiggyBank },
+  { name: "Orçamentos", href: "/orcamentos", icon: Target },
+  { name: "Fluxo Caixa", href: "/fluxo-caixa", icon: LineChart },
 ];
 
 const Layout = () => {

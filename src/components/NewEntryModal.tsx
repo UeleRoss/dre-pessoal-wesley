@@ -1,17 +1,13 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentBrazilDate } from "@/utils/dateUtils";
-import { Pencil } from "lucide-react";
-
+import { X, Plus, Trash2, Edit2, Check } from "lucide-react";
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -19,36 +15,29 @@ interface NewEntryModalProps {
   onSuccess: () => void;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  user_id?: string;
-  is_default?: boolean;
-}
-
-// Categorias específicas por tipo
-const SAIDA_CATEGORIES = [
-  "Apartamento",
-  "Escritório",
-  "Contas mensais",
-  "Estudos",
-  "Lazer e ócio",
-  "Comida",
-  "Tráfego Pago",
-  "Vida esportiva",
-  "Go On Outdoor",
-  "Carro",
-  "Itens Físicos"
-];
-
-const ENTRADA_CATEGORIES = [
-  "Go On Outdoor",
-  "Global Vita",
-  "Hotmart Go On",
-  "Produto Online",
-  "Stripe/assinaturas",
-  "Outras receitas"
-];
+// Categorias por tipo (entrada/saída) e unidade de negócio
+const CATEGORIES_BY_TYPE_AND_UNIT: Record<string, Record<string, string[]>> = {
+  'saida': {
+    'Apartamento': ['Condomínio', 'Aluguel', 'Luz', 'Água', 'Internet', 'Gás', 'IPTU', 'Reformas', 'Manutenção', 'Móveis'],
+    'Escritório': ['Aluguel', 'Luz', 'Internet', 'Material de Escritório', 'Limpeza', 'Equipamentos', 'Software', 'Telefone'],
+    'Viagens e Lazer': ['Passagens', 'Hospedagem', 'Alimentação', 'Passeios', 'Ingressos', 'Souvenirs', 'Transporte'],
+    'Vida Esportiva': ['Academia', 'Personal Trainer', 'Equipamentos', 'Roupas Esportivas', 'Suplementos', 'Competições'],
+    'Compras Pessoais': ['Roupas', 'Eletrônicos', 'Livros', 'Acessórios', 'Presentes', 'Cosméticos', 'Farmácia'],
+    'Go On Outdoor': ['Despesas Operacionais', 'Marketing', 'Fornecedores', 'Equipamentos', 'Logística', 'Taxas'],
+    'Carro': ['Combustível', 'Manutenção', 'Seguro', 'IPVA', 'Estacionamento', 'Multas', 'Lavagem', 'Pedágio'],
+    'Comida': ['Supermercado', 'Restaurante', 'Delivery', 'Padaria', 'Feira', 'Açougue', 'Bebidas'],
+  },
+  'entrada': {
+    'Apartamento': ['Aluguel Recebido', 'Venda de Móveis', 'Reembolso de Despesas', 'Devolução de Caução'],
+    'Escritório': ['Receitas de Serviços', 'Consultorias', 'Reembolsos', 'Venda de Equipamentos'],
+    'Viagens e Lazer': ['Reembolsos', 'Prêmios', 'Cashback'],
+    'Vida Esportiva': ['Prêmios', 'Patrocínios', 'Venda de Equipamentos', 'Reembolsos'],
+    'Compras Pessoais': ['Vendas', 'Reembolsos', 'Devoluções', 'Cashback'],
+    'Go On Outdoor': ['Vendas Online', 'Vendas Presenciais', 'Parcerias', 'Comissões', 'Patrocínios', 'Eventos'],
+    'Carro': ['Venda do Veículo', 'Aluguel do Veículo', 'Reembolso de Combustível', 'Indenização de Seguro'],
+    'Comida': ['Venda de Produtos', 'Reembolsos'],
+  },
+};
 
 const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   const [formData, setFormData] = useState({
@@ -56,36 +45,21 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     amount: '',
     description: '',
     category: '',
-    bank: '',
     date: getCurrentBrazilDate(),
+    business_unit_id: null as string | null,
   });
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
   const [user, setUser] = useState<any>(null);
+  const [businessUnits, setBusinessUnits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState('');
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editedCategoryName, setEditedCategoryName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showManageCategories, setShowManageCategories] = useState(false);
 
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Buscar bancos do usuário via query direta
-  const { data: allUserBanks = [] } = useQuery({
-    queryKey: ['user-banks', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('financial_items')
-        .select('bank')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      
-      const uniqueBanks = [...new Set(data.map(item => item.bank))].filter(Boolean);
-      return uniqueBanks.sort();
-    },
-    enabled: !!user?.id
-  });
-
-  // Buscar usuário atual
   useEffect(() => {
     const getUser = async () => {
       try {
@@ -98,137 +72,27 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     getUser();
   }, []);
 
-  // Buscar categorias personalizadas do usuário logado
-  const { data: customCategories = [] } = useQuery({
-    queryKey: ['custom-categories', formData.type, user?.id],
-    queryFn: async () => {
-      if (!formData.type || !user?.id) return [];
-      
-      console.log("Buscando categorias para tipo:", formData.type, "usuário:", user.id);
-      
+  useEffect(() => {
+    const fetchBusinessUnits = async () => {
+      if (!user?.id) return;
       try {
         const { data, error } = await supabase
-          .from('categories')
+          .from('business_units')
           .select('*')
           .eq('user_id', user.id)
           .order('name');
-        
-        if (error) {
-          console.error("Erro ao buscar categorias:", error);
-          return [];
+        if (!error && data) {
+          setBusinessUnits(data);
         }
-        
-        console.log("Categorias encontradas:", data || []);
-        return data as Category[];
       } catch (error) {
-        console.error("Erro inesperado ao buscar categorias:", error);
-        return [];
+        console.error('Erro ao buscar unidades:', error);
       }
-    },
-    enabled: !!formData.type && !!user?.id && isOpen,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  // Combinar categorias padrão com personalizadas baseado no tipo
-  const getAvailableCategories = () => {
-    if (!formData.type) return [];
-    
-    const defaultCategories = formData.type === 'saida' ? SAIDA_CATEGORIES : ENTRADA_CATEGORIES;
-    
-    const allCategories = [
-      ...defaultCategories.map(name => ({
-        id: `default-${name}`,
-        name,
-        is_default: true
-      })),
-      ...customCategories
-    ];
-    
-    return allCategories;
-  };
-
-  // Criar nova categoria
-  const createCategoryMutation = useMutation({
-    mutationFn: async (categoryName: string) => {
-      if (!user?.id) throw new Error('Usuário não autenticado');
-
-      const { data, error } = await supabase
-        .from('categories')
-        .insert([{
-          name: categoryName,
-          user_id: user.id
-        }])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (newCategory) => {
-      toast({
-        title: "Categoria criada",
-        description: `Categoria "${newCategory.name}" adicionada com sucesso!`,
-      });
-      setFormData({ ...formData, category: newCategory.name });
-      setNewCategoryName('');
-      setShowNewCategoryInput(false);
-      queryClient.invalidateQueries({ queryKey: ['custom-categories'] });
-    },
-    onError: (error) => {
-      console.error("Erro ao criar categoria:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar categoria.",
-        variant: "destructive",
-      });
+    };
+    if (isOpen && user?.id) {
+      fetchBusinessUnits();
     }
-  });
+  }, [isOpen, user?.id]);
 
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (!user?.id) throw new Error('Usuário não autenticado');
-
-      const { error } = await supabase
-        .from('financial_items')
-        .insert([{
-          ...data,
-          amount: parseFloat(data.amount),
-          user_id: user.id
-        }]);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Lançamento criado",
-        description: "Lançamento adicionado com sucesso!",
-      });
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      console.error("Erro ao criar lançamento:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar lançamento.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(formData);
-  };
-
-  const handleCreateNewCategory = () => {
-    if (newCategoryName.trim()) {
-      createCategoryMutation.mutate(newCategoryName.trim());
-    }
-  };
-
-  // Reset form quando o modal abrir
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -236,43 +100,134 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
         amount: '',
         description: '',
         category: '',
-        bank: '',
         date: getCurrentBrazilDate(),
+        business_unit_id: null,
       });
-      setShowNewCategoryInput(false);
-      setNewCategoryName('');
+      setCategories([]);
+      setNewCategory('');
+      setShowAddCategory(false);
+      setShowManageCategories(false);
+      setEditingCategory(null);
     }
   }, [isOpen]);
 
-  // Reset categoria quando mudar o tipo
+  // Atualizar categorias quando mudar tipo OU unidade
   useEffect(() => {
-    if (formData.type) {
-      setFormData(prev => ({ ...prev, category: '' }));
+    if (formData.type && formData.business_unit_id) {
+      const selectedUnit = businessUnits.find(u => u.id === formData.business_unit_id);
+      if (selectedUnit) {
+        const categoriesForTypeAndUnit = CATEGORIES_BY_TYPE_AND_UNIT[formData.type]?.[selectedUnit.name] || [];
+        setCategories([...categoriesForTypeAndUnit]);
+        setFormData(prev => ({ ...prev, category: '' }));
+      }
+    } else {
+      setCategories([]);
     }
-  }, [formData.type]);
+  }, [formData.type, formData.business_unit_id, businessUnits]);
 
-  const availableCategories = getAvailableCategories();
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      setCategories([...categories, newCategory.trim()]);
+      setNewCategory('');
+      setShowAddCategory(false);
+      toast({
+        title: "Categoria adicionada",
+        description: `"${newCategory}" foi adicionada.`,
+      });
+    }
+  };
+
+  const handleStartEditCategory = (category: string) => {
+    setEditingCategory(category);
+    setEditedCategoryName(category);
+  };
+
+  const handleSaveEditCategory = () => {
+    if (editedCategoryName.trim() && editingCategory) {
+      const updatedCategories = categories.map(cat =>
+        cat === editingCategory ? editedCategoryName.trim() : cat
+      );
+      setCategories(updatedCategories);
+
+      if (formData.category === editingCategory) {
+        setFormData({ ...formData, category: editedCategoryName.trim() });
+      }
+
+      setEditingCategory(null);
+      setEditedCategoryName('');
+      toast({
+        title: "Categoria editada",
+        description: `Categoria atualizada com sucesso.`,
+      });
+    }
+  };
+
+  const handleRemoveCategory = (categoryToRemove: string) => {
+    setCategories(categories.filter(c => c !== categoryToRemove));
+    if (formData.category === categoryToRemove) {
+      setFormData({ ...formData, category: '' });
+    }
+    toast({
+      title: "Categoria removida",
+      description: `"${categoryToRemove}" foi removida.`,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id) {
+      toast({ title: "Erro", description: "Usuário não autenticado", variant: "destructive" });
+      return;
+    }
+
+    if (!formData.business_unit_id) {
+      toast({ title: "Erro", description: "Selecione uma unidade de negócio", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('financial_items').insert([{
+        type: formData.type,
+        amount: parseFloat(formData.amount),
+        description: formData.description,
+        category: formData.category,
+        bank: 'N/A',
+        date: formData.date,
+        business_unit_id: formData.business_unit_id,
+        user_id: user.id,
+      }]);
+      if (error) throw error;
+      toast({ title: "Sucesso", description: "Lançamento criado!" });
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error("Erro:", error);
+      toast({ title: "Erro", description: error.message || "Erro ao criar lançamento.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const showCategories = formData.type && formData.business_unit_id && categories.length > 0;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Novo Lançamento</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-xl font-semibold">Novo Lançamento</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <Label htmlFor="type">Tipo</Label>
-            <Select
-              value={formData.type}
-              onValueChange={(value) => {
-                console.log("Tipo selecionado:", value);
-                setFormData({ ...formData, type: value });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
+            <Label>Tipo *</Label>
+            <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value, category: '' })} required>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="entrada">Entrada</SelectItem>
                 <SelectItem value="saida">Saída</SelectItem>
@@ -281,118 +236,165 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           </div>
 
           <div>
-            <Label htmlFor="amount">Valor</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              placeholder="0.00"
+            <Label>Unidade de Negócio *</Label>
+            <Select
+              value={formData.business_unit_id || 'none'}
+              onValueChange={(value) => setFormData({ ...formData, business_unit_id: value === 'none' ? null : value, category: '' })}
               required
-            />
+            >
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" disabled>Selecione uma unidade</SelectItem>
+                {businessUnits.map((unit) => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: unit.color }} />
+                      {unit.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div>
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Ex: Salário, Conta de luz"
-              required
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Label htmlFor="category">Categoria</Label>
-              {formData.type && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowNewCategoryInput(!showNewCategoryInput)}
-                  className="h-6 w-6 p-0"
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-            
-            {showNewCategoryInput && (
-              <div className="flex gap-2 mb-2">
-                <Input
-                  placeholder="Nome da nova categoria"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleCreateNewCategory()}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleCreateNewCategory}
-                  disabled={!newCategoryName.trim()}
-                >
-                  Criar
-                </Button>
+          {showCategories && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Categoria *</Label>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowManageCategories(!showManageCategories)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAddCategory(!showAddCategory)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            )}
-            
-            <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value })}
-              disabled={!formData.type}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableCategories.map((category) => (
-                  <SelectItem key={category.id} value={category.name}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+              {showAddCategory && (
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="Nova categoria"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCategory();
+                      }
+                    }}
+                  />
+                  <Button type="button" size="sm" onClick={handleAddCategory}>
+                    Adicionar
+                  </Button>
+                </div>
+              )}
+
+              {showManageCategories && (
+                <div className="mb-3 p-3 border rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+                  <p className="text-xs text-gray-600 mb-2 font-semibold">Gerenciar Categorias:</p>
+                  <div className="space-y-2">
+                    {categories.map((cat) => (
+                      <div key={cat} className="flex items-center gap-2 bg-white p-2 rounded border">
+                        {editingCategory === cat ? (
+                          <>
+                            <Input
+                              value={editedCategoryName}
+                              onChange={(e) => setEditedCategoryName(e.target.value)}
+                              className="flex-1 h-8"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSaveEditCategory();
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={handleSaveEditCategory}
+                            >
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 text-sm">{cat}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleStartEditCategory(cat)}
+                            >
+                              <Edit2 className="h-3 w-3 text-blue-600" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleRemoveCategory(cat)}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })} required>
+                <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div>
+            <Label>Valor *</Label>
+            <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} placeholder="0.00" required />
           </div>
 
           <div>
-            <Label htmlFor="bank">Banco</Label>
-            <Select
-              value={formData.bank}
-              onValueChange={(value) => setFormData({ ...formData, bank: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o banco" />
-              </SelectTrigger>
-              <SelectContent>
-                {(allUserBanks || []).map((bank) => (
-                  <SelectItem key={bank} value={bank}>
-                    {bank}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Descrição *</Label>
+            <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Ex: Conta de luz de Janeiro" required />
           </div>
 
           <div>
-            <Label htmlFor="date">Data</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              required
-            />
+            <Label>Data *</Label>
+            <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} required />
           </div>
 
-          <Button type="submit">
-            Adicionar
-          </Button>
+          <div className="flex gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Adicionar'}
+            </Button>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 

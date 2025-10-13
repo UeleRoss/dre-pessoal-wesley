@@ -8,6 +8,7 @@ export const useLancamentosState = () => {
   const [filterType, setFilterType] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterBank, setFilterBank] = useState("all");
+  const [filterBusinessUnit, setFilterBusinessUnit] = useState<string | null>(null);
   const [showNewEntryModal, setShowNewEntryModal] = useState(false);
   const [editingItem, setEditingItem] = useState<FinancialItem | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -19,6 +20,7 @@ export const useLancamentosState = () => {
     setFilterType("all");
     setFilterCategory("all");
     setFilterBank("all");
+    setFilterBusinessUnit(null);
   };
 
   const handleSelectItem = (itemId: string, checked: boolean) => {
@@ -55,8 +57,9 @@ export const useLancamentosState = () => {
       const categoryMatches = filterCategory === "all" || item.category === filterCategory;
       const typeMatches = filterType === "all" || item.type === filterType;
       const bankMatches = filterBank === "all" || item.bank === filterBank;
+      const businessUnitMatches = filterBusinessUnit === null || item.business_unit_id === filterBusinessUnit;
 
-      return descriptionMatches && categoryMatches && typeMatches && bankMatches;
+      return descriptionMatches && categoryMatches && typeMatches && bankMatches && businessUnitMatches;
     });
   };
 
@@ -69,6 +72,8 @@ export const useLancamentosState = () => {
     setFilterCategory,
     filterBank,
     setFilterBank,
+    filterBusinessUnit,
+    setFilterBusinessUnit,
     showNewEntryModal,
     setShowNewEntryModal,
     editingItem,

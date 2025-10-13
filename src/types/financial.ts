@@ -1,3 +1,4 @@
+import { BusinessUnit } from './business-unit';
 
 export interface FinancialItem {
   id: string;
@@ -10,6 +11,8 @@ export interface FinancialItem {
   bank: string;
   source: string | null;
   user_id: string;
+  business_unit_id?: string | null;
+  business_unit?: BusinessUnit;
 }
 
 export interface FinancialSummary {

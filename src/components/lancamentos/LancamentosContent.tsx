@@ -6,6 +6,7 @@ import NewEntryModal from "@/components/NewEntryModal";
 import EditEntryModal from "@/components/EditEntryModal";
 import ExportSelectedButton from "@/components/ExportSelectedButton";
 import FilterSummaryCard from "@/components/FilterSummaryCard";
+import BusinessUnitsNav from "@/components/BusinessUnitsNav";
 
 import { FinancialItem } from "@/types/financial";
 
@@ -40,11 +41,15 @@ const LancamentosContent = ({
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Summary Cards */}
+      {/* Business Units Navigation */}
       <div className="animate-fade-in">
-        <FinancialSummaryCards items={financialItems} />
+        <BusinessUnitsNav onSelectUnit={lancamentosState.setFilterBusinessUnit} />
       </div>
 
+      {/* Summary Cards */}
+      <div className="animate-fade-in">
+        <FinancialSummaryCards items={filteredItems} />
+      </div>
 
       {/* Filters */}
       <div className="animate-fade-in">
@@ -106,11 +111,13 @@ const LancamentosContent = ({
       </div>
 
       {/* Modals */}
-      <NewEntryModal
-        isOpen={lancamentosState.showNewEntryModal}
-        onClose={() => lancamentosState.setShowNewEntryModal(false)}
-        onSuccess={refetch}
-      />
+      {lancamentosState.showNewEntryModal && (
+        <NewEntryModal
+          isOpen={lancamentosState.showNewEntryModal}
+          onClose={() => lancamentosState.setShowNewEntryModal(false)}
+          onSuccess={refetch}
+        />
+      )}
 
       <EditEntryModal
         isOpen={!!lancamentosState.editingItem}
