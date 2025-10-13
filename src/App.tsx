@@ -58,7 +58,9 @@ function AppContent() {
 
   // Se estiver autenticado mas não completou o onboarding, mostrar onboarding
   if (profile && !profile.onboarding_completed) {
-    return <OnboardingFlow onComplete={() => window.location.reload()} />;
+    return <OnboardingFlow onComplete={() => {
+      // Não precisa fazer nada aqui, o React Query vai atualizar automaticamente
+    }} />;
   }
 
   // Se tudo estiver ok, mostrar aplicação normal

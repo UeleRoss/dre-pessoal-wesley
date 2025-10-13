@@ -80,29 +80,29 @@ const PeriodSelector = ({ selectedMonth, periodType, onMonthChange, onPeriodType
   };
 
   return (
-    <div className="flex items-center justify-between bg-white rounded-xl shadow-lg p-4 gap-4">
-      <div className="flex items-center gap-4">
-        <Select value={periodType} onValueChange={onPeriodTypeChange}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">Mês</SelectItem>
-            <SelectItem value="year">Ano</SelectItem>
-            <SelectItem value="all">Todos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="flex items-center gap-4">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white rounded-xl shadow-lg p-3 sm:p-4">
+      {/* Seletor de período */}
+      <Select value={periodType} onValueChange={onPeriodTypeChange}>
+        <SelectTrigger className="w-full sm:w-32">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="month">Mês</SelectItem>
+          <SelectItem value="year">Ano</SelectItem>
+          <SelectItem value="all">Todos</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Navegação e display */}
+      <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3 flex-1">
         {getNavigationButtons()}
-        
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-navy-800">
+
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-center sm:justify-start">
+          <h2 className="text-base sm:text-lg font-bold text-navy-800 whitespace-nowrap">
             {getDisplayText()}
           </h2>
           {periodType !== 'all' && (
-            <Button variant="ghost" onClick={goToCurrent} className="text-sm">
+            <Button variant="ghost" onClick={goToCurrent} className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">
               {periodType === 'month' ? 'Mês Atual' : 'Ano Atual'}
             </Button>
           )}

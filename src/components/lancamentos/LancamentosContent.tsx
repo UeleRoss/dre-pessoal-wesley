@@ -4,9 +4,13 @@ import LancamentosFilters from "@/components/LancamentosFilters";
 import FinancialItemsList from "@/components/FinancialItemsList";
 import NewEntryModal from "@/components/NewEntryModal";
 import EditEntryModal from "@/components/EditEntryModal";
+import BulkEditModal from "@/components/BulkEditModal";
 import ExportSelectedButton from "@/components/ExportSelectedButton";
 import FilterSummaryCard from "@/components/FilterSummaryCard";
 import BusinessUnitsNav from "@/components/BusinessUnitsNav";
+import { Button } from "@/components/ui/button";
+import { Edit } from "lucide-react";
+import { useState } from "react";
 
 import { FinancialItem } from "@/types/financial";
 
@@ -37,6 +41,7 @@ const LancamentosContent = ({
   lancamentosState,
   financialItemActions
 }: LancamentosContentProps) => {
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const filteredItems = lancamentosState.getFilteredItems(financialItems);
 
   return (
@@ -79,10 +84,18 @@ const LancamentosContent = ({
         />
       </div>
 
-      {/* Export Selected Button - Show only when items are selected */}
+      {/* Action Buttons - Show only when items are selected */}
       {lancamentosState.selectedItems.length > 0 && (
         <div className="animate-fade-in">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            <Button
+              onClick={() => setShowBulkEditModal(true)}
+              variant="outline"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Editar {lancamentosState.selectedItems.length} selecionado(s)
+            </Button>
             <ExportSelectedButton
               selectedItems={lancamentosState.selectedItems}
               allItems={allItems}
@@ -124,6 +137,17 @@ const LancamentosContent = ({
         onClose={financialItemActions.handleCloseEditModal}
         item={lancamentosState.editingItem}
         onSuccess={refetch}
+        userId={user?.id || ''}
+      />
+
+      <BulkEditModal
+        isOpen={showBulkEditModal}
+        onClose={() => setShowBulkEditModal(false)}
+        onSuccess={() => {
+          refetch();
+          lancamentosState.setSelectedItems([]);
+        }}
+        selectedItemIds={lancamentosState.selectedItems}
         userId={user?.id || ''}
       />
     </div>

@@ -115,7 +115,7 @@ export const useUserProfile = () => {
     profile,
     isLoading,
     error,
-    updateProfile: updateProfileMutation.mutate,
+    updateProfile: updateProfileMutation.mutateAsync,
     isUpdating: updateProfileMutation.isPending,
     completeOnboarding: completeOnboardingMutation.mutate,
     isCompletingOnboarding: completeOnboardingMutation.isPending,

@@ -1,31 +1,18 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Edit2, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
-interface FinancialItem {
-  id: string;
-  description: string;
-  amount: number;
-  type: string;
-  category: string;
-  bank: string;
-  date: string;
-  business_unit_id?: string | null;
-}
-
-interface EditEntryModalProps {
+interface BulkEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  item: FinancialItem | null;
+  selectedItemIds: string[];
   userId: string;
 }
 
@@ -53,32 +40,19 @@ const CATEGORIES_BY_TYPE_AND_UNIT: Record<string, Record<string, string[]>> = {
   },
 };
 
-const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryModalProps) => {
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [type, setType] = useState("");
-  const [category, setCategory] = useState("");
-  const [businessUnitId, setBusinessUnitId] = useState<string | null>(null);
-  const [date, setDate] = useState("");
+const BulkEditModal = ({ isOpen, onClose, onSuccess, selectedItemIds, userId }: BulkEditModalProps) => {
+  const [businessUnitId, setBusinessUnitId] = useState<string>('');
+  const [category, setCategory] = useState<string>('');
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [selectedItemsType, setSelectedItemsType] = useState<string>('');
   const [newCategory, setNewCategory] = useState('');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedCategoryName, setEditedCategoryName] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (item) {
-      setDescription(item.description);
-      setAmount(item.amount.toString());
-      setType(item.type);
-      setCategory(item.category);
-      setBusinessUnitId(item.business_unit_id || null);
-      setDate(item.date);
-    }
-  }, [item]);
 
   useEffect(() => {
     const fetchBusinessUnits = async () => {
@@ -96,23 +70,44 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
         console.error('Erro ao buscar unidades:', error);
       }
     };
+
+    const fetchSelectedItemsType = async () => {
+      if (selectedItemIds.length === 0) return;
+      try {
+        const { data, error } = await supabase
+          .from('financial_items')
+          .select('type')
+          .in('id', selectedItemIds)
+          .limit(1)
+          .single();
+
+        if (!error && data) {
+          setSelectedItemsType(data.type);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar tipo dos itens:', error);
+      }
+    };
+
     if (isOpen && userId) {
       fetchBusinessUnits();
+      fetchSelectedItemsType();
     }
-  }, [isOpen, userId]);
+  }, [isOpen, userId, selectedItemIds]);
 
-  // Atualizar categorias quando mudar tipo OU unidade
+  // Atualizar categorias quando mudar a unidade
   useEffect(() => {
-    if (type && businessUnitId) {
+    if (selectedItemsType && businessUnitId) {
       const selectedUnit = businessUnits.find(u => u.id === businessUnitId);
       if (selectedUnit) {
-        const categoriesForTypeAndUnit = CATEGORIES_BY_TYPE_AND_UNIT[type]?.[selectedUnit.name] || [];
+        const categoriesForTypeAndUnit = CATEGORIES_BY_TYPE_AND_UNIT[selectedItemsType]?.[selectedUnit.name] || [];
         setCategories([...categoriesForTypeAndUnit]);
+        setCategory('');
       }
     } else {
       setCategories([]);
     }
-  }, [type, businessUnitId, businessUnits]);
+  }, [selectedItemsType, businessUnitId, businessUnits]);
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
@@ -165,8 +160,6 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!item) return;
-
     if (!businessUnitId) {
       toast({
         title: "Erro",
@@ -176,44 +169,55 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       return;
     }
 
-    const { error } = await supabase
-      .from('financial_items')
-      .update({
-        description,
-        amount: parseFloat(amount),
-        type,
-        category,
-        business_unit_id: businessUnitId,
-        date,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', item.id);
-
-    if (error) {
+    if (!category) {
       toast({
         title: "Erro",
-        description: "Erro ao editar lançamento",
+        description: "Selecione uma categoria",
         variant: "destructive",
       });
-    } else {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('financial_items')
+        .update({
+          business_unit_id: businessUnitId,
+          category: category,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', selectedItemIds);
+
+      if (error) throw error;
+
       toast({
         title: "Sucesso",
-        description: "Lançamento editado com sucesso",
+        description: `${selectedItemIds.length} lançamento(s) atualizado(s) com sucesso`,
       });
+
       onSuccess();
+      handleClose();
+    } catch (error: any) {
+      console.error('Erro ao atualizar lançamentos:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar lançamentos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const resetForm = () => {
-    setDescription("");
-    setAmount("");
-    setType("");
-    setCategory("");
-    setBusinessUnitId(null);
-    setDate("");
+    setBusinessUnitId('');
+    setCategory('');
     setCategories([]);
     setShowAddCategory(false);
     setShowManageCategories(false);
+    setSelectedItemsType('');
   };
 
   const handleClose = () => {
@@ -221,37 +225,26 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
     onClose();
   };
 
-  const showCategoriesSection = type && businessUnitId && categories.length > 0;
+  const showCategoriesSection = businessUnitId && categories.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Lançamento</DialogTitle>
+          <DialogTitle>Editar {selectedItemIds.length} Lançamento(s)</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="type">Tipo</Label>
-            <Select value={type} onValueChange={(value) => {
-              setType(value);
-              setCategory('');
-            }} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="entrada">Entrada</SelectItem>
-                <SelectItem value="saida">Saída</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+            <strong>Atenção:</strong> Você está editando {selectedItemIds.length} lançamento(s) de uma vez.
+            As alterações serão aplicadas a todos os itens selecionados.
           </div>
 
           <div>
             <Label htmlFor="business_unit">Unidade de Negócio</Label>
             <Select
-              value={businessUnitId || 'none'}
+              value={businessUnitId}
               onValueChange={(value) => {
-                setBusinessUnitId(value === 'none' ? null : value);
+                setBusinessUnitId(value);
                 setCategory('');
               }}
               required
@@ -260,7 +253,6 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
                 <SelectValue placeholder="Selecione uma unidade" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none" disabled>Selecione uma unidade</SelectItem>
                 {businessUnits.map((unit) => (
                   <SelectItem key={unit.id} value={unit.id}>
                     <div className="flex items-center gap-2">
@@ -389,46 +381,12 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
             </div>
           )}
 
-          <div>
-            <Label htmlFor="amount">Valor</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Conta de luz de Janeiro"
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="date">Data</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={handleClose}>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-orange-500 hover:bg-orange-600">
-              Salvar Alterações
+            <Button type="submit" className="bg-orange-500 hover:bg-orange-600" disabled={isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </div>
         </form>
@@ -437,4 +395,4 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   );
 };
 
-export default EditEntryModal;
+export default BulkEditModal;

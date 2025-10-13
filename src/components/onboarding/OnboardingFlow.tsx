@@ -20,7 +20,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     selectedCategories: [] as string[],
   });
 
-  const { updateProfile, completeOnboarding, isCompletingOnboarding } = useUserProfile();
+  const { updateProfile, isUpdating } = useUserProfile();
 
   const totalSteps = 3;
   const progress = (currentStep / totalSteps) * 100;
@@ -38,14 +38,18 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   };
 
   const handleComplete = async () => {
-    // Atualizar o nome do usuário
-    updateProfile({ display_name: formData.displayName });
+    try {
+      // Atualizar o nome do usuário e marcar onboarding como completo em uma única operação
+      await updateProfile({
+        display_name: formData.displayName,
+        onboarding_completed: true
+      });
 
-    // Marcar onboarding como completo
-    completeOnboarding();
-
-    // Chamar callback de conclusão
-    onComplete();
+      // Chamar callback de conclusão após a atualização ser bem-sucedida
+      onComplete();
+    } catch (error) {
+      console.error('Erro ao completar onboarding:', error);
+    }
   };
 
   const updateFormData = (field: string, value: any) => {
@@ -124,10 +128,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             ) : (
               <Button
                 onClick={handleComplete}
-                disabled={!canProceed() || isCompletingOnboarding}
+                disabled={!canProceed() || isUpdating}
                 className="w-32 bg-green-600 hover:bg-green-700"
               >
-                {isCompletingOnboarding ? (
+                {isUpdating ? (
                   "Finalizando..."
                 ) : (
                   <>
