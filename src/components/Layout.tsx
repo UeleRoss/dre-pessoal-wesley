@@ -8,10 +8,14 @@ import {
   PiggyBank,
   BarChart3,
   Target,
-  LineChart
+  LineChart,
+  LogOut
 } from "lucide-react";
 import UserNameEditor from "./UserNameEditor";
-import { useUserName } from "@/hooks/useUserName";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "./ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -24,7 +28,25 @@ const navigation = [
 
 const Layout = () => {
   const location = useLocation();
-  const { userName, updateUserName } = useUserName();
+  const { profile, updateProfile } = useUserProfile();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        title: "Erro ao sair",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      window.location.reload();
+    }
+  };
+
+  const handleNameChange = (newName: string) => {
+    updateProfile({ display_name: newName });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy-50 to-navy-100 w-full">
@@ -38,15 +60,20 @@ const Layout = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-white">DRE Pessoal {userName}</h1>
-                  <UserNameEditor currentName={userName} onNameChange={updateUserName} />
+                  <h1 className="text-xl font-bold text-white">
+                    DRE Pessoal {profile?.display_name ? `da ${profile.display_name}` : ''}
+                  </h1>
+                  <UserNameEditor
+                    currentName={profile?.display_name || 'Usuário'}
+                    onNameChange={handleNameChange}
+                  />
                 </div>
                 <p className="text-navy-200 text-sm">Controle Financeiro Pessoal</p>
               </div>
             </div>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex space-x-1">
+            <nav className="hidden md:flex items-center space-x-1">
               {navigation.map((item) => {
                 const isActive = location.pathname === item.href;
                 return (
@@ -65,6 +92,15 @@ const Layout = () => {
                   </Link>
                 );
               })}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-navy-200 hover:bg-navy-600 hover:text-white ml-2"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
+              </Button>
             </nav>
           </div>
         </div>
@@ -91,6 +127,13 @@ const Layout = () => {
                   </Link>
                 );
               })}
+              <button
+                onClick={handleLogout}
+                className="flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 text-navy-300 hover:text-orange-300"
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="text-xs mt-1">Sair</span>
+              </button>
             </div>
           </div>
         </div>

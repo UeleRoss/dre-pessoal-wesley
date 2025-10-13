@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import Auth from "@/components/Auth";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 import DashboardStats from "@/components/dashboard/DashboardStats";
@@ -24,10 +23,6 @@ const Dashboard = () => {
   }, []);
 
   const dashboardData = useDashboardData(user, selectedPeriod);
-
-  if (!user) {
-    return <Auth onAuthChange={setUser} />;
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
