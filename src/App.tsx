@@ -10,11 +10,13 @@ import Contas from './pages/Contas';
 import Investimentos from './pages/Investimentos';
 import Orcamentos from './pages/Orcamentos';
 import FluxoCaixa from './pages/FluxoCaixa';
+import CreditCards from './pages/CreditCards';
 import NotFound from './pages/NotFound';
 import Auth from './components/Auth';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { useUserProfile } from './hooks/useUserProfile';
 import { Toaster } from './components/ui/toaster';
+import { checkAndGenerateRecurringExpenses } from './utils/recurringExpensesScheduler';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -38,6 +40,13 @@ function AppContent() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Gerar contas recorrentes automaticamente quando o usuário estiver autenticado
+  useEffect(() => {
+    if (user?.id && profile?.onboarding_completed) {
+      checkAndGenerateRecurringExpenses(user.id);
+    }
+  }, [user?.id, profile?.onboarding_completed]);
 
   // Mostrar loading enquanto verifica autenticação
   if (loading || (user && isLoadingProfile)) {
@@ -75,6 +84,7 @@ function AppContent() {
           <Route path="investimentos" element={<Investimentos />} />
           <Route path="orcamentos" element={<Orcamentos />} />
           <Route path="fluxo-caixa" element={<FluxoCaixa />} />
+          <Route path="cartoes" element={<CreditCards />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

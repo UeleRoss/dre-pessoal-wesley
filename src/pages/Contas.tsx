@@ -9,6 +9,7 @@ import ValueAdjustmentModal from "@/components/contas/ValueAdjustmentModal";
 import CreditCardChargesSection from "@/components/contas/CreditCardChargesSection";
 import MonthSelector from "@/components/contas/MonthSelector";
 import DownloadContasButton from "@/components/contas/DownloadContasButton";
+import BankBalancesManager from "@/components/contas/BankBalancesManager";
 import { useContasLogic } from "@/hooks/useContasLogic";
 import { useState } from "react";
 
@@ -37,7 +38,11 @@ const Contas = () => {
     deleteBillMutation,
     togglePaidMutation,
     calculateCurrentBalances,
-    calculateTotals
+    calculateTotals,
+    bankBalances,
+    userBanks,
+    updateBankBalances,
+    isUpdatingBankBalances
   } = useContasLogic(selectedMonth);
 
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
@@ -125,6 +130,13 @@ const Contas = () => {
           total: bills.length,
           paid: bills.filter(b => b.paid_this_month).length
         }}
+      />
+
+      <BankBalancesManager
+        bankBalances={bankBalances}
+        userBanks={userBanks}
+        onSave={updateBankBalances}
+        isSaving={isUpdatingBankBalances}
       />
 
       <BillsList

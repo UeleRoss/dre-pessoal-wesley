@@ -43,7 +43,9 @@ export const useContasLogic = (selectedMonth: Date) => {
     bankBalances,
     monthlyItems,
     calculateCurrentBalances,
-    calculateTotals
+    calculateTotals,
+    updateBankBalances,
+    isUpdatingBankBalances
   } = useContasCalculations(user, selectedMonth, billsWithMonthlyData, userBanks);
 
   return {
@@ -69,6 +71,8 @@ export const useContasLogic = (selectedMonth: Date) => {
     getCurrentBillValue,
     isBillPaidThisMonth,
     calculateCurrentBalances,
-    calculateTotals
+    calculateTotals,
+    updateBankBalances,
+    isUpdatingBankBalances
   };
 };

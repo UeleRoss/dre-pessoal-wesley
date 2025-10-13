@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Repeat, Calendar, CreditCard } from "lucide-react";
 import { formatBrazilDate, formatBrazilDateTime } from "@/utils/dateUtils";
 import { FinancialItem } from "@/types/financial";
 import {
@@ -70,6 +70,30 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
             {isExpenseSummary && (
               <Badge variant="outline" className={`${getBadgeColor()} text-xs`}>
                 Resumo de Gastos
+              </Badge>
+            )}
+
+            {/* Badge: Recorrente */}
+            {item.is_recurring && (
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
+                <Repeat className="h-3 w-3 mr-1" />
+                Recorrente
+              </Badge>
+            )}
+
+            {/* Badge: Parcelado */}
+            {item.is_installment && (
+              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-300">
+                <Calendar className="h-3 w-3 mr-1" />
+                {item.installment_number}/{item.total_installments}
+              </Badge>
+            )}
+
+            {/* Badge: Cartão de Crédito */}
+            {item.credit_card && (
+              <Badge variant="outline" className="text-xs bg-pink-50 text-pink-700 border-pink-300">
+                <CreditCard className="h-3 w-3 mr-1" />
+                {item.credit_card}
               </Badge>
             )}
           </div>

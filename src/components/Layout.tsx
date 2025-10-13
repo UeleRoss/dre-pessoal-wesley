@@ -20,7 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Lançamentos", href: "/lancamentos", icon: Receipt },
-  { name: "Contas", href: "/contas", icon: CreditCard },
+  { name: "Cartões", href: "/cartoes", icon: CreditCard },
+  { name: "Contas", href: "/contas", icon: TrendingUp },
   { name: "Investimentos", href: "/investimentos", icon: PiggyBank },
   { name: "Orçamentos", href: "/orcamentos", icon: Target },
   { name: "Fluxo Caixa", href: "/fluxo-caixa", icon: LineChart },

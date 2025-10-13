@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Edit2, Check } from "lucide-react";
+import { useUnitCategories } from "@/hooks/useUnitCategories";
+import type { TransactionType } from "@/constants/default-categories";
 
 interface FinancialItem {
   id: string;
@@ -29,30 +31,6 @@ interface EditEntryModalProps {
   userId: string;
 }
 
-// Categorias por tipo (entrada/saída) e unidade de negócio
-const CATEGORIES_BY_TYPE_AND_UNIT: Record<string, Record<string, string[]>> = {
-  'saida': {
-    'Apartamento': ['Condomínio', 'Aluguel', 'Luz', 'Água', 'Internet', 'Gás', 'IPTU', 'Reformas', 'Manutenção', 'Móveis'],
-    'Escritório': ['Aluguel', 'Luz', 'Internet', 'Material de Escritório', 'Limpeza', 'Equipamentos', 'Software', 'Telefone'],
-    'Viagens e Lazer': ['Passagens', 'Hospedagem', 'Alimentação', 'Passeios', 'Ingressos', 'Souvenirs', 'Transporte'],
-    'Vida Esportiva': ['Academia', 'Personal Trainer', 'Equipamentos', 'Roupas Esportivas', 'Suplementos', 'Competições'],
-    'Compras Pessoais': ['Roupas', 'Eletrônicos', 'Livros', 'Acessórios', 'Presentes', 'Cosméticos', 'Farmácia'],
-    'Go On Outdoor': ['Despesas Operacionais', 'Marketing', 'Fornecedores', 'Equipamentos', 'Logística', 'Taxas'],
-    'Carro': ['Combustível', 'Manutenção', 'Seguro', 'IPVA', 'Estacionamento', 'Multas', 'Lavagem', 'Pedágio'],
-    'Comida': ['Supermercado', 'Restaurante', 'Delivery', 'Padaria', 'Feira', 'Açougue', 'Bebidas'],
-  },
-  'entrada': {
-    'Apartamento': ['Aluguel Recebido', 'Venda de Móveis', 'Reembolso de Despesas', 'Devolução de Caução'],
-    'Escritório': ['Receitas de Serviços', 'Consultorias', 'Reembolsos', 'Venda de Equipamentos'],
-    'Viagens e Lazer': ['Reembolsos', 'Prêmios', 'Cashback'],
-    'Vida Esportiva': ['Prêmios', 'Patrocínios', 'Venda de Equipamentos', 'Reembolsos'],
-    'Compras Pessoais': ['Vendas', 'Reembolsos', 'Devoluções', 'Cashback'],
-    'Go On Outdoor': ['Vendas Online', 'Vendas Presenciais', 'Parcerias', 'Comissões', 'Patrocínios', 'Eventos'],
-    'Carro': ['Venda do Veículo', 'Aluguel do Veículo', 'Reembolso de Combustível', 'Indenização de Seguro'],
-    'Comida': ['Venda de Produtos', 'Reembolsos'],
-  },
-};
-
 const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryModalProps) => {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -61,13 +39,56 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   const [businessUnitId, setBusinessUnitId] = useState<string | null>(null);
   const [date, setDate] = useState("");
   const [businessUnits, setBusinessUnits] = useState<any[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState('');
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editedCategoryName, setEditedCategoryName] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
   const { toast } = useToast();
+
+  const transactionType = useMemo<TransactionType | null>(() => {
+    if (type === 'entrada' || type === 'saida') {
+      return type;
+    }
+    return null;
+  }, [type]);
+
+  const selectedUnit = useMemo(() => {
+    if (!businessUnitId) return null;
+    return businessUnits.find(unit => unit.id === businessUnitId) || null;
+  }, [businessUnits, businessUnitId]);
+
+  const {
+    categories: unitCategories,
+    isLoading: isLoadingUnitCategories,
+    addCategory: addUnitCategory,
+    updateCategory: updateUnitCategory,
+    removeCategory: removeUnitCategory,
+    isAdding: isAddingCategory,
+    isUpdating: isUpdatingCategory,
+    isRemoving: isRemovingCategory,
+  } = useUnitCategories({
+    userId,
+    businessUnitId,
+    businessUnitName: selectedUnit?.name ?? null,
+    type: transactionType,
+  });
+
+  const categoryOptions = useMemo(() => {
+    const options = unitCategories.map(category => category.name);
+    if (category && !options.includes(category)) {
+      options.push(category);
+    }
+    return options;
+  }, [unitCategories, category]);
+
+  const currentEditingCategory = useMemo(
+    () => unitCategories.find(categoryItem => categoryItem.id === editingCategoryId) || null,
+    [unitCategories, editingCategoryId]
+  );
+
+  const showCategoriesSection = Boolean(transactionType && businessUnitId);
+  const isMutatingCategory = isAddingCategory || isUpdatingCategory || isRemovingCategory;
 
   useEffect(() => {
     if (item) {
@@ -101,65 +122,90 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
     }
   }, [isOpen, userId]);
 
-  // Atualizar categorias quando mudar tipo OU unidade
   useEffect(() => {
-    if (type && businessUnitId) {
-      const selectedUnit = businessUnits.find(u => u.id === businessUnitId);
-      if (selectedUnit) {
-        const categoriesForTypeAndUnit = CATEGORIES_BY_TYPE_AND_UNIT[type]?.[selectedUnit.name] || [];
-        setCategories([...categoriesForTypeAndUnit]);
-      }
-    } else {
-      setCategories([]);
+    if (!showCategoriesSection) {
+      setCategory('');
+      return;
     }
-  }, [type, businessUnitId, businessUnits]);
 
-  const handleAddCategory = () => {
-    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()]);
-      setNewCategory('');
-      setShowAddCategory(false);
-      toast({
-        title: "Categoria adicionada",
-        description: `"${newCategory}" foi adicionada.`,
-      });
-    }
-  };
-
-  const handleStartEditCategory = (category: string) => {
-    setEditingCategory(category);
-    setEditedCategoryName(category);
-  };
-
-  const handleSaveEditCategory = () => {
-    if (editedCategoryName.trim() && editingCategory) {
-      const updatedCategories = categories.map(cat =>
-        cat === editingCategory ? editedCategoryName.trim() : cat
-      );
-      setCategories(updatedCategories);
-
-      if (category === editingCategory) {
-        setCategory(editedCategoryName.trim());
-      }
-
-      setEditingCategory(null);
-      setEditedCategoryName('');
-      toast({
-        title: "Categoria editada",
-        description: `Categoria atualizada com sucesso.`,
-      });
-    }
-  };
-
-  const handleRemoveCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter(c => c !== categoryToRemove));
-    if (category === categoryToRemove) {
+    if (category && !categoryOptions.includes(category)) {
       setCategory('');
     }
-    toast({
-      title: "Categoria removida",
-      description: `"${categoryToRemove}" foi removida.`,
-    });
+  }, [showCategoriesSection, categoryOptions, category]);
+
+  useEffect(() => {
+    if (!showManageCategories) {
+      setEditingCategoryId(null);
+      setEditedCategoryName('');
+    }
+  }, [showManageCategories]);
+
+  const handleAddCategory = async () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+
+    if (!transactionType || !businessUnitId) {
+      toast({
+        title: "Selecione unidade e tipo",
+        description: "Escolha o tipo e a unidade antes de adicionar categorias.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exists = categoryOptions.some(
+      (option) => option.localeCompare(trimmed, 'pt-BR', { sensitivity: 'accent' }) === 0
+    );
+    if (exists) {
+      toast({
+        title: "Categoria já existe",
+        description: "Você já possui uma categoria com este nome.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await addUnitCategory(trimmed);
+      setNewCategory('');
+      setShowAddCategory(false);
+    } catch (error) {
+      // handled by toast
+    }
+  };
+
+  const handleStartEditCategory = (categoryId: string, name: string) => {
+    setEditingCategoryId(categoryId);
+    setEditedCategoryName(name);
+  };
+
+  const handleSaveEditCategory = async () => {
+    if (!editingCategoryId) return;
+    const trimmed = editedCategoryName.trim();
+    if (!trimmed) return;
+
+    const originalName = currentEditingCategory?.name;
+    try {
+      await updateUnitCategory({ id: editingCategoryId, name: trimmed });
+      if (originalName && category === originalName) {
+        setCategory(trimmed);
+      }
+      setEditingCategoryId(null);
+      setEditedCategoryName('');
+    } catch (error) {
+      // handled by toast
+    }
+  };
+
+  const handleRemoveCategory = async (categoryId: string, name: string) => {
+    try {
+      await removeUnitCategory(categoryId);
+      if (category === name) {
+        setCategory('');
+      }
+    } catch (error) {
+      // handled by toast
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,6 +217,15 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       toast({
         title: "Erro",
         description: "Selecione uma unidade de negócio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!category) {
+      toast({
+        title: "Erro",
+        description: "Selecione uma categoria",
         variant: "destructive",
       });
       return;
@@ -211,17 +266,17 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
     setCategory("");
     setBusinessUnitId(null);
     setDate("");
-    setCategories([]);
     setShowAddCategory(false);
     setShowManageCategories(false);
+    setEditingCategoryId(null);
+    setEditedCategoryName('');
+    setNewCategory('');
   };
 
   const handleClose = () => {
     resetForm();
     onClose();
   };
-
-  const showCategoriesSection = type && businessUnitId && categories.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -283,6 +338,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowManageCategories(!showManageCategories)}
+                    disabled={isLoadingUnitCategories}
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
@@ -291,6 +347,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowAddCategory(!showAddCategory)}
+                    disabled={isLoadingUnitCategories}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -309,8 +366,14 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
                         handleAddCategory();
                       }
                     }}
+                    disabled={isMutatingCategory || isLoadingUnitCategories}
                   />
-                  <Button type="button" size="sm" onClick={handleAddCategory}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddCategory}
+                    disabled={isMutatingCategory || isLoadingUnitCategories}
+                  >
                     Adicionar
                   </Button>
                 </div>
@@ -319,71 +382,92 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
               {showManageCategories && (
                 <div className="mb-3 p-3 border rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
                   <p className="text-xs text-gray-600 mb-2 font-semibold">Gerenciar Categorias:</p>
-                  <div className="space-y-2">
-                    {categories.map((cat) => (
-                      <div key={cat} className="flex items-center gap-2 bg-white p-2 rounded border">
-                        {editingCategory === cat ? (
-                          <>
-                            <Input
-                              value={editedCategoryName}
-                              onChange={(e) => setEditedCategoryName(e.target.value)}
-                              className="flex-1 h-8"
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleSaveEditCategory();
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={handleSaveEditCategory}
-                            >
-                              <Check className="h-4 w-4 text-green-600" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="flex-1 text-sm">{cat}</span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleStartEditCategory(cat)}
-                            >
-                              <Edit2 className="h-3 w-3 text-blue-600" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleRemoveCategory(cat)}
-                            >
-                              <Trash2 className="h-3 w-3 text-red-600" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  {isLoadingUnitCategories ? (
+                    <p className="text-xs text-gray-500">Carregando categorias...</p>
+                  ) : unitCategories.length === 0 ? (
+                    <p className="text-xs text-gray-500">Nenhuma categoria cadastrada. Adicione novas usando o botão “+”.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {unitCategories.map((categoryItem) => (
+                        <div key={categoryItem.id} className="flex items-center gap-2 bg-white p-2 rounded border">
+                          {editingCategoryId === categoryItem.id ? (
+                            <>
+                              <Input
+                                value={editedCategoryName}
+                                onChange={(e) => setEditedCategoryName(e.target.value)}
+                                className="flex-1 h-8"
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveEditCategory();
+                                  }
+                                }}
+                                disabled={isUpdatingCategory}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={handleSaveEditCategory}
+                                disabled={isUpdatingCategory}
+                              >
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-sm">{categoryItem.name}</span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleStartEditCategory(categoryItem.id, categoryItem.name)}
+                                disabled={isMutatingCategory}
+                              >
+                                <Edit2 className="h-3 w-3 text-blue-600" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleRemoveCategory(categoryItem.id, categoryItem.name)}
+                                disabled={isMutatingCategory}
+                              >
+                                <Trash2 className="h-3 w-3 text-red-600" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              <Select value={category} onValueChange={setCategory} required>
+              <Select
+                value={category}
+                onValueChange={setCategory}
+                required
+                disabled={isLoadingUnitCategories || categoryOptions.length === 0}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
+                  <SelectValue placeholder={isLoadingUnitCategories ? "Carregando categorias..." : "Selecione uma categoria"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {categoryOptions.length === 0 ? (
+                    <SelectItem value="__sem_categorias" disabled>
+                      Nenhuma categoria disponível
                     </SelectItem>
-                  ))}
+                  ) : (
+                    categoryOptions.map((catName) => (
+                      <SelectItem key={catName} value={catName}>
+                        {catName}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

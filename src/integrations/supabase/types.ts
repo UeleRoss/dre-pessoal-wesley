@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       bank_balances: {
         Row: {
+          baseline_date: string
           bank_name: string
           created_at: string
           id: string
@@ -24,6 +25,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          baseline_date?: string
           bank_name: string
           created_at?: string
           id?: string
@@ -32,6 +34,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          baseline_date?: string
           bank_name?: string
           created_at?: string
           id?: string
@@ -137,16 +140,174 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_cards: {
+        Row: {
+          closing_day: number
+          color: string
+          created_at: string
+          credit_limit: number | null
+          due_day: number
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closing_day: number
+          color?: string
+          created_at?: string
+          credit_limit?: number | null
+          due_day: number
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closing_day?: number
+          color?: string
+          created_at?: string
+          credit_limit?: number | null
+          due_day?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_units: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recurring_templates: {
+        Row: {
+          amount: number
+          business_unit_id: string | null
+          category: string
+          created_at: string
+          credit_card: string | null
+          description: string
+          id: string
+          is_active: boolean
+          last_generated_month: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          business_unit_id?: string | null
+          category: string
+          created_at?: string
+          credit_card?: string | null
+          description: string
+          id?: string
+          is_active?: boolean
+          last_generated_month?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          business_unit_id?: string | null
+          category?: string
+          created_at?: string
+          credit_card?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          last_generated_month?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      unit_categories: {
+        Row: {
+          business_unit_id: string
+          created_at: string
+          id: string
+          name: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_unit_id: string
+          created_at?: string
+          id?: string
+          name: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_unit_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_categories_business_unit_id_fkey"
+            columns: ["business_unit_id"]
+            isOneToOne: false
+            referencedRelation: "business_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_items: {
         Row: {
           amount: number
           bank: string
+          business_unit_id: string | null
           category: string
           created_at: string
+          credit_card: string | null
           date: string
           description: string
           id: string
+          installment_group_id: string | null
+          installment_number: number | null
+          is_installment: boolean
+          is_recurring: boolean
+          recurring_status: string | null
+          recurring_template_id: string | null
           source: string | null
+          total_installments: number | null
           type: string
           updated_at: string
           user_id: string
@@ -154,12 +315,21 @@ export type Database = {
         Insert: {
           amount: number
           bank: string
+          business_unit_id?: string | null
           category: string
           created_at?: string
+          credit_card?: string | null
           date: string
           description: string
           id?: string
+          installment_group_id?: string | null
+          installment_number?: number | null
+          is_installment?: boolean
+          is_recurring?: boolean
+          recurring_status?: string | null
+          recurring_template_id?: string | null
           source?: string | null
+          total_installments?: number | null
           type: string
           updated_at?: string
           user_id?: string
@@ -167,17 +337,41 @@ export type Database = {
         Update: {
           amount?: number
           bank?: string
+          business_unit_id?: string | null
           category?: string
           created_at?: string
+          credit_card?: string | null
           date?: string
           description?: string
           id?: string
+          installment_group_id?: string | null
+          installment_number?: number | null
+          is_installment?: boolean
+          is_recurring?: boolean
+          recurring_status?: string | null
+          recurring_template_id?: string | null
           source?: string | null
+          total_installments?: number | null
           type?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "financial_items_business_unit_id_fkey"
+            columns: ["business_unit_id"]
+            isOneToOne: false
+            referencedRelation: "business_units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_items_recurring_template_id_fkey"
+            columns: ["recurring_template_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       financial_summary: {
         Row: {

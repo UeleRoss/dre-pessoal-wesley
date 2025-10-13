@@ -8,6 +8,7 @@ import BulkEditModal from "@/components/BulkEditModal";
 import ExportSelectedButton from "@/components/ExportSelectedButton";
 import FilterSummaryCard from "@/components/FilterSummaryCard";
 import BusinessUnitsNav from "@/components/BusinessUnitsNav";
+import RecurringExpensesPanel from "@/components/RecurringExpensesPanel";
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import { useState } from "react";
@@ -44,11 +45,23 @@ const LancamentosContent = ({
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const filteredItems = lancamentosState.getFilteredItems(financialItems);
 
+  // Formatar mês para o formato YYYY-MM
+  const currentMonthStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`;
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Business Units Navigation */}
       <div className="animate-fade-in">
         <BusinessUnitsNav onSelectUnit={lancamentosState.setFilterBusinessUnit} />
+      </div>
+
+      {/* Recurring Expenses Panel */}
+      <div className="animate-fade-in">
+        <RecurringExpensesPanel
+          user={user}
+          currentMonth={currentMonthStr}
+          onApprove={refetch}
+        />
       </div>
 
       {/* Summary Cards */}
