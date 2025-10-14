@@ -246,6 +246,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
         category,
         business_unit_id: businessUnitId,
         date,
+        needs_review: false, // Remove flag de revisão ao salvar
         updated_at: new Date().toISOString()
       })
       .eq('id', item.id);

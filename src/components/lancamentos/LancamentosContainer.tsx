@@ -4,12 +4,14 @@ import Auth from "@/components/Auth";
 import { useFinancialData } from "@/hooks/useFinancialData";
 import { useLancamentosState } from "@/hooks/useLancamentosState";
 import { useFinancialItemActions } from "@/components/FinancialItemActions";
+import PDFImportModal from "@/components/PDFImportModal";
 
 import LancamentosHeader from "./LancamentosHeader";
 import LancamentosContent from "./LancamentosContent";
 
 const LancamentosContainer = () => {
   const [user, setUser] = useState<any>(null);
+  const [showPDFImportModal, setShowPDFImportModal] = useState(false);
 
   const lancamentosState = useLancamentosState();
   const { selectedMonth, periodType } = lancamentosState;
@@ -53,6 +55,7 @@ const LancamentosContainer = () => {
       <div className="container mx-auto px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
         <LancamentosHeader
           onNewEntry={() => lancamentosState.setShowNewEntryModal(true)}
+          onImportPDF={() => setShowPDFImportModal(true)}
           selectedMonth={selectedMonth}
           onMonthChange={lancamentosState.setSelectedMonth}
           periodType={periodType}
@@ -68,6 +71,17 @@ const LancamentosContainer = () => {
           refetch={refetch}
           lancamentosState={lancamentosState}
           financialItemActions={financialItemActions}
+        />
+
+        {/* Modal de importação de PDF */}
+        <PDFImportModal
+          isOpen={showPDFImportModal}
+          onClose={() => setShowPDFImportModal(false)}
+          onSuccess={() => {
+            refetch();
+            setShowPDFImportModal(false);
+          }}
+          userId={user?.id || ''}
         />
       </div>
     </div>

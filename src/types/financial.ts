@@ -27,6 +27,10 @@ export interface FinancialItem {
   installment_number?: number | null;
   total_installments?: number | null;
   installment_group_id?: string | null;
+
+  // Importação de PDF
+  needs_review?: boolean;
+  imported_from?: string | null;
 }
 
 export interface FinancialSummary {

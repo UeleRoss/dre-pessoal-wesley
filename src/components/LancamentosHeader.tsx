@@ -1,11 +1,12 @@
 
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, FileUp } from "lucide-react";
 import PeriodSelector, { PeriodType } from "./PeriodSelector";
 import { FinancialItem } from "@/types/financial";
 
 interface LancamentosHeaderProps {
   onNewEntry: () => void;
+  onImportPDF?: () => void;
   selectedMonth: Date;
   onMonthChange: (date: Date) => void;
   periodType: PeriodType;
@@ -15,6 +16,7 @@ interface LancamentosHeaderProps {
 
 const LancamentosHeader = ({
   onNewEntry,
+  onImportPDF,
   selectedMonth,
   onMonthChange,
   periodType,
@@ -29,11 +31,23 @@ const LancamentosHeader = ({
           <p className="text-sm md:text-base text-gray-600 mt-1">Gerencie suas entradas e saídas</p>
         </div>
 
-        {/* Botão de novo lançamento - sempre visível no topo em mobile */}
-        <Button onClick={onNewEntry} className="w-full sm:w-auto shrink-0">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Lançamento
-        </Button>
+        {/* Botões de ação */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {onImportPDF && (
+            <Button
+              onClick={onImportPDF}
+              variant="outline"
+              className="w-full sm:w-auto shrink-0"
+            >
+              <FileUp className="h-4 w-4 mr-2" />
+              Importar PDF
+            </Button>
+          )}
+          <Button onClick={onNewEntry} className="w-full sm:w-auto shrink-0">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Lançamento
+          </Button>
+        </div>
       </div>
 
       {/* Seletor de período - linha separada */}

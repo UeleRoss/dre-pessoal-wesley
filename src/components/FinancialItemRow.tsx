@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, Trash2, Repeat, Calendar, CreditCard } from "lucide-react";
+import { Edit, Trash2, Repeat, Calendar, CreditCard, AlertTriangle } from "lucide-react";
 import { formatBrazilDate, formatBrazilDateTime } from "@/utils/dateUtils";
 import { FinancialItem } from "@/types/financial";
 import {
@@ -42,6 +42,7 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
   };
   
   const getRowBgColor = () => {
+    if (item.needs_review) return 'bg-yellow-50 border-yellow-300';
     if (isIncomeSummary) return 'bg-green-50 border-green-200';
     if (isExpenseSummary) return 'bg-blue-50 border-blue-200';
     return '';
@@ -62,6 +63,15 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
             <Badge variant={item.type === 'entrada' ? 'default' : 'destructive'} className="text-xs">
               {item.type === 'entrada' ? 'Entrada' : 'Saída'}
             </Badge>
+
+            {/* Badge: Precisa Revisão */}
+            {item.needs_review && (
+              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800 border-yellow-400 animate-pulse">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Precisa Revisão
+              </Badge>
+            )}
+
             {isIncomeSummary && (
               <Badge variant="outline" className={`${getBadgeColor()} text-xs`}>
                 Resumo de Receitas
@@ -109,6 +119,9 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
 
           <div className="text-xs text-gray-400 mt-1">
             {isSummary ? 'Dados históricos agregados' : `Criado em: ${formatBrazilDateTime(item.created_at)}`}
+            {item.imported_from && (
+              <span className="ml-2 text-yellow-600">📄 {item.imported_from}</span>
+            )}
           </div>
         </div>
       </div>
