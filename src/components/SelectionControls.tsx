@@ -17,8 +17,8 @@ const SelectionControls = ({
   onSelectAllComplete
 }: SelectionControlsProps) => {
   return (
-    <div className="flex flex-col gap-2 p-4 border-b bg-gray-50 rounded">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border border-gray-200 bg-gray-50 rounded-md">
+      <div className="flex items-center gap-2">
         <Checkbox
           checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
           onCheckedChange={onSelectAll}
@@ -27,8 +27,8 @@ const SelectionControls = ({
           Selecionar todos do mês atual ({filteredItems.length})
         </span>
       </div>
-      
-      <div className="flex items-center gap-3">
+
+      <div className="flex items-center gap-2">
         <Checkbox
           checked={selectedItems.length === allItems.length && allItems.length > 0}
           onCheckedChange={onSelectAllComplete}

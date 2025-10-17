@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,15 @@ import { Label } from "@/components/ui/label";
 import { CreditCard } from "lucide-react";
 import { useCreditCards } from "@/hooks/useCreditCards";
 import { useToast } from "@/hooks/use-toast";
+import type { CreditCard as CreditCardType } from "@/types/financial";
 
 interface AddCreditCardModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   userId: string;
+  mode?: "create" | "edit";
+  card?: CreditCardType | null;
 }
 
 const PRESET_COLORS = [
@@ -31,17 +35,48 @@ const PRESET_COLORS = [
   '#6366f1', // indigo
 ];
 
-const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCardModalProps) => {
-  const { toast } = useToast();
-  const { addCard } = useCreditCards(userId);
+const defaultFormState = {
+  name: '',
+  due_day: '10',
+  closing_day: '5',
+  credit_limit: '',
+  color: '#3b82f6',
+};
 
-  const [formData, setFormData] = useState({
-    name: '',
-    due_day: 10,
-    closing_day: 5,
-    credit_limit: '',
-    color: '#3b82f6',
-  });
+const AddCreditCardModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  userId,
+  mode = "create",
+  card = null,
+}: AddCreditCardModalProps) => {
+  const { toast } = useToast();
+  const { addCard, updateCard, deactivateCard } = useCreditCards(userId);
+
+  const [formData, setFormData] = useState(() => ({ ...defaultFormState }));
+  const isEditMode = mode === "edit" && !!card;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    if (isEditMode && card) {
+      setFormData({
+        name: card.name || '',
+        due_day: String(card.due_day ?? defaultFormState.due_day),
+        closing_day: String(card.closing_day ?? defaultFormState.closing_day),
+        credit_limit: card.credit_limit != null ? String(card.credit_limit) : '',
+        color: card.color || defaultFormState.color,
+      });
+    } else {
+      setFormData({ ...defaultFormState });
+    }
+  }, [isOpen, isEditMode, card]);
+
+  const isSaving = isEditMode ? updateCard.isPending : addCard.isPending;
+  const isDeleting = deactivateCard.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +90,10 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
       return;
     }
 
-    if (formData.due_day < 1 || formData.due_day > 31) {
+    const dueDay = parseInt(formData.due_day, 10);
+    const closingDay = parseInt(formData.closing_day, 10);
+
+    if (Number.isNaN(dueDay) || dueDay < 1 || dueDay > 31) {
       toast({
         title: "Erro",
         description: "Dia de vencimento deve estar entre 1 e 31",
@@ -64,7 +102,7 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
       return;
     }
 
-    if (formData.closing_day < 1 || formData.closing_day > 31) {
+    if (Number.isNaN(closingDay) || closingDay < 1 || closingDay > 31) {
       toast({
         title: "Erro",
         description: "Dia de fechamento deve estar entre 1 e 31",
@@ -74,51 +112,78 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
     }
 
     try {
-      await addCard.mutateAsync({
-        name: formData.name.trim(),
-        due_day: formData.due_day,
-        closing_day: formData.closing_day,
-        credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : null,
-        color: formData.color,
-      });
+      if (isEditMode && card) {
+        await updateCard.mutateAsync({
+          id: card.id,
+          updates: {
+            name: formData.name.trim(),
+            due_day: dueDay,
+            closing_day: closingDay,
+            credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : null,
+            color: formData.color,
+          }
+        });
+      } else {
+        await addCard.mutateAsync({
+          name: formData.name.trim(),
+          due_day: dueDay,
+          closing_day: closingDay,
+          credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : null,
+          color: formData.color,
+        });
+      }
 
-      toast({
-        title: "Cartão adicionado!",
-        description: `${formData.name} foi cadastrado com sucesso`,
-      });
-
-      // Reset form
-      setFormData({
-        name: '',
-        due_day: 10,
-        closing_day: 5,
-        credit_limit: '',
-        color: '#3b82f6',
-      });
-
+      setFormData({ ...defaultFormState });
       onSuccess();
       onClose();
-    } catch (error: any) {
-      toast({
-        title: "Erro ao adicionar cartão",
-        description: error.message || "Ocorreu um erro ao cadastrar o cartão",
-        variant: "destructive",
-      });
+    } catch (error) {
+      console.error('Erro ao salvar cartão:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!isEditMode || !card) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Tem certeza que deseja excluir o cartão "${card.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deactivateCard.mutateAsync(card.id);
+      setFormData({ ...defaultFormState });
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Erro ao excluir cartão:', error);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Adicionar Cartão de Crédito
+            {isEditMode ? 'Editar Cartão de Crédito' : 'Adicionar Cartão de Crédito'}
           </DialogTitle>
+          <DialogDescription>
+            {isEditMode
+              ? 'Atualize as informações do cartão ou remova-o caso não utilize mais.'
+              : 'Cadastre os dados do cartão para controlar as faturas e vincular seus lançamentos.'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Nome do Cartão */}
           <div>
             <Label htmlFor="card-name">Nome do Cartão *</Label>
             <Input
@@ -126,11 +191,11 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
               placeholder="Ex: Nubank Ultravioleta"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              disabled={isSaving || isDeleting}
               required
             />
           </div>
 
-          {/* Dias de Vencimento e Fechamento */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="due-day">Dia Vencimento *</Label>
@@ -140,7 +205,8 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
                 min="1"
                 max="31"
                 value={formData.due_day}
-                onChange={(e) => setFormData({ ...formData, due_day: parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, due_day: e.target.value })}
+                disabled={isSaving || isDeleting}
                 required
               />
             </div>
@@ -152,13 +218,13 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
                 min="1"
                 max="31"
                 value={formData.closing_day}
-                onChange={(e) => setFormData({ ...formData, closing_day: parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, closing_day: e.target.value })}
+                disabled={isSaving || isDeleting}
                 required
               />
             </div>
           </div>
 
-          {/* Limite de Crédito (opcional) */}
           <div>
             <Label htmlFor="credit-limit">Limite de Crédito (opcional)</Label>
             <Input
@@ -168,10 +234,10 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
               placeholder="R$ 5000.00"
               value={formData.credit_limit}
               onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
+              disabled={isSaving || isDeleting}
             />
           </div>
 
-          {/* Cor do Cartão */}
           <div>
             <Label>Cor do Cartão</Label>
             <div className="flex gap-2 mt-2">
@@ -184,18 +250,31 @@ const AddCreditCardModal = ({ isOpen, onClose, onSuccess, userId }: AddCreditCar
                   }`}
                   style={{ backgroundColor: color }}
                   onClick={() => setFormData({ ...formData, color })}
+                  disabled={isSaving || isDeleting}
                 />
               ))}
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={addCard.isPending}>
-              {addCard.isPending ? 'Salvando...' : 'Salvar Cartão'}
-            </Button>
+          <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            {isEditMode && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isSaving || isDeleting}
+              >
+                {isDeleting ? 'Excluindo...' : 'Excluir Cartão'}
+              </Button>
+            )}
+            <div className="flex gap-2 w-full sm:w-auto sm:justify-end">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving || isDeleting}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSaving || isDeleting}>
+                {isSaving ? 'Salvando...' : isEditMode ? 'Salvar Alterações' : 'Salvar Cartão'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

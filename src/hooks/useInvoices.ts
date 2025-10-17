@@ -3,14 +3,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCardInvoice } from "@/types/financial";
 
-export const useInvoices = (userId: string, month: string) => {
+export const useInvoices = (userId: string, month?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Query: Buscar faturas consolidadas do mês
-  const { data: invoices = [], isLoading } = useQuery<CreditCardInvoice[]>({
+  const { data: invoices = [], isLoading, refetch } = useQuery<CreditCardInvoice[]>({
     queryKey: ['invoices', userId, month],
     queryFn: async () => {
+      if (!month) {
+        // Se não foi passado mês, buscar todas as faturas
+        const { data, error } = await supabase
+          .from('credit_card_invoices')
+          .select('*')
+          .eq('user_id', userId)
+          .order('reference_month', { ascending: false })
+          .order('card_name');
+
+        if (error) throw error;
+        return data || [];
+      }
+
       const referenceMonth = `${month}-01`;
 
       const { data, error } = await supabase
@@ -23,7 +36,7 @@ export const useInvoices = (userId: string, month: string) => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!userId && !!month
+    enabled: !!userId
   });
 
   // Query: Buscar lançamentos detalhados de um cartão específico no mês
@@ -54,18 +67,24 @@ export const useInvoices = (userId: string, month: string) => {
   const markAsPaid = useMutation({
     mutationFn: async ({
       cardId,
-      paid,
-      paymentDate
+      referenceMonth,
+      paid = true,
+      paymentDate = null
     }: {
       cardId: string;
-      paid: boolean;
-      paymentDate: string | null;
+      referenceMonth: string;
+      paid?: boolean;
+      paymentDate?: string | null;
     }) => {
-      const referenceMonth = `${month}-01`;
-
       // Buscar fatura total do mês
-      const invoice = invoices.find(inv => inv.credit_card_id === cardId);
+      const invoice = invoices.find(
+        inv => inv.credit_card_id === cardId && inv.reference_month === referenceMonth
+      );
       if (!invoice) throw new Error('Fatura não encontrada');
+
+      const paymentDateValue = paid && !paymentDate
+        ? new Date().toISOString().split('T')[0]
+        : paymentDate;
 
       // Verificar se já existe registro de pagamento
       const { data: existing } = await supabase
@@ -82,7 +101,7 @@ export const useInvoices = (userId: string, month: string) => {
           .from('invoice_payments')
           .update({
             paid,
-            payment_date: paymentDate,
+            payment_date: paymentDateValue,
             invoice_amount: invoice.total_amount
           })
           .eq('id', existing.id);
@@ -98,7 +117,7 @@ export const useInvoices = (userId: string, month: string) => {
             reference_month: referenceMonth,
             invoice_amount: invoice.total_amount,
             paid,
-            payment_date: paymentDate
+            payment_date: paymentDateValue
           }]);
 
         if (error) throw error;
@@ -122,9 +141,18 @@ export const useInvoices = (userId: string, month: string) => {
 
   // Mutation: Adicionar nota à fatura
   const addNote = useMutation({
-    mutationFn: async ({ cardId, note }: { cardId: string; note: string }) => {
-      const referenceMonth = `${month}-01`;
-      const invoice = invoices.find(inv => inv.credit_card_id === cardId);
+    mutationFn: async ({
+      cardId,
+      referenceMonth,
+      note
+    }: {
+      cardId: string;
+      referenceMonth: string;
+      note: string;
+    }) => {
+      const invoice = invoices.find(
+        inv => inv.credit_card_id === cardId && inv.reference_month === referenceMonth
+      );
       if (!invoice) throw new Error('Fatura não encontrada');
 
       const { data: existing } = await supabase
@@ -174,6 +202,7 @@ export const useInvoices = (userId: string, month: string) => {
   return {
     invoices,
     isLoading,
+    refetch,
     useInvoiceDetails,
     markAsPaid,
     addNote,

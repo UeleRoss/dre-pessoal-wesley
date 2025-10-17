@@ -8,10 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Edit2, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Trash2, Edit2, Check, CreditCard as CreditCardIcon, Repeat, Calendar } from "lucide-react";
 import { useUnitCategories } from "@/hooks/useUnitCategories";
 import type { TransactionType } from "@/constants/default-categories";
 import type { BusinessUnit } from "@/types/business-unit";
+import { useCreditCards } from "@/hooks/useCreditCards";
 
 interface FinancialItem {
   id: string;
@@ -22,6 +24,15 @@ interface FinancialItem {
   bank: string;
   date: string;
   business_unit_id?: string | null;
+  user_id?: string;
+  is_recurring?: boolean;
+  recurring_template_id?: string | null;
+  recurring_status?: 'pending' | 'approved' | 'skipped' | null;
+  credit_card?: string | null;
+  is_installment?: boolean;
+  total_installments?: number | null;
+  installment_group_id?: string | null;
+  installment_number?: number | null;
 }
 
 interface EditEntryModalProps {
@@ -39,6 +50,10 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   const [category, setCategory] = useState("");
   const [businessUnitId, setBusinessUnitId] = useState<string | null>(null);
   const [date, setDate] = useState("");
+  const [creditCard, setCreditCard] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [totalInstallments, setTotalInstallments] = useState(1);
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
   const [newCategory, setNewCategory] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -46,6 +61,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showManageCategories, setShowManageCategories] = useState(false);
   const { toast } = useToast();
+  const { creditCards, isLoading: isLoadingCreditCards } = useCreditCards(userId);
 
   const transactionType = useMemo<TransactionType | null>(() => {
     if (type === 'entrada' || type === 'saida') {
@@ -99,6 +115,11 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       setCategory(item.category);
       setBusinessUnitId(item.business_unit_id || null);
       setDate(item.date);
+      setCreditCard(item.credit_card || "");
+      const isExpense = item.type === 'saida';
+      setIsRecurring(isExpense ? !!item.is_recurring : false);
+      setIsInstallment(isExpense ? !!item.is_installment : false);
+      setTotalInstallments(item.total_installments || 1);
     }
   }, [item]);
 
@@ -130,14 +151,17 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
 
   useEffect(() => {
     if (!showCategoriesSection) {
-      setCategory('');
       return;
     }
 
-    if (category && !categoryOptions.includes(category)) {
+    if (isLoadingUnitCategories) {
+      return;
+    }
+
+    if (category && categoryOptions.length > 0 && !categoryOptions.includes(category)) {
       setCategory('');
     }
-  }, [showCategoriesSection, categoryOptions, category]);
+  }, [showCategoriesSection, isLoadingUnitCategories, categoryOptions, category]);
 
   useEffect(() => {
     if (!showManageCategories) {
@@ -237,18 +261,135 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       return;
     }
 
-    const { error } = await supabase
-      .from('financial_items')
-      .update({
-        description,
-        amount: parseFloat(amount),
+    const parsedAmount = parseFloat(amount);
+    if (Number.isNaN(parsedAmount)) {
+      toast({
+        title: "Erro",
+        description: "Informe um valor numérico válido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const allowAdvancedOptions = type === 'saida';
+    const applyRecurring = allowAdvancedOptions && isRecurring;
+    const applyInstallment = allowAdvancedOptions && isInstallment;
+
+    if (applyRecurring && !userId) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível identificar o usuário para criar a recorrência.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const updates: Record<string, any> = {
+      description,
+      amount: parsedAmount,
+      type,
+      category,
+      business_unit_id: businessUnitId,
+      date,
+      needs_review: false,
+      updated_at: new Date().toISOString(),
+      credit_card: allowAdvancedOptions && creditCard ? creditCard : null,
+    };
+
+    // === Contas Recorrentes ===
+    if (applyRecurring) {
+      let templateId = item.recurring_template_id || null;
+      const templatePayload = {
         type,
+        amount: parsedAmount,
+        description,
         category,
         business_unit_id: businessUnitId,
-        date,
-        needs_review: false, // Remove flag de revisão ao salvar
-        updated_at: new Date().toISOString()
-      })
+        credit_card: updates.credit_card,
+        is_active: true,
+      };
+
+      if (item.is_recurring && item.recurring_template_id) {
+        const { error: updateTemplateError } = await supabase
+          .from('recurring_templates')
+          .update(templatePayload)
+          .eq('id', item.recurring_template_id);
+
+        if (updateTemplateError) {
+          console.error('Erro ao atualizar template recorrente:', updateTemplateError);
+          toast({
+            title: "Erro ao atualizar recorrência",
+            description: updateTemplateError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+        templateId = item.recurring_template_id;
+      } else {
+        const { data: template, error: templateError } = await supabase
+          .from('recurring_templates')
+          .insert([{
+            ...templatePayload,
+            user_id: userId,
+          }])
+          .select()
+          .single();
+
+        if (templateError) {
+          console.error('Erro ao criar template recorrente:', templateError);
+          toast({
+            title: "Erro ao criar recorrência",
+            description: templateError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+        templateId = template?.id || null;
+      }
+
+      updates.is_recurring = true;
+      updates.recurring_template_id = templateId;
+      updates.recurring_status = item.recurring_status ?? 'approved';
+    } else {
+      updates.is_recurring = false;
+      updates.recurring_template_id = null;
+      updates.recurring_status = null;
+
+      if (item.is_recurring && item.recurring_template_id) {
+        const { error: deactivateTemplateError } = await supabase
+          .from('recurring_templates')
+          .update({ is_active: false })
+          .eq('id', item.recurring_template_id);
+
+        if (deactivateTemplateError) {
+          console.error('Erro ao desativar template recorrente:', deactivateTemplateError);
+          toast({
+            title: "Erro ao desativar recorrência",
+            description: deactivateTemplateError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
+    // === Parcelamento ===
+    if (applyInstallment) {
+      const ensuredInstallments = Math.max(2, totalInstallments || 2);
+      updates.is_installment = true;
+      updates.total_installments = ensuredInstallments;
+      updates.installment_group_id = item.installment_group_id || item.id;
+      updates.installment_number = item.installment_number || 1;
+    } else {
+      updates.is_installment = false;
+      updates.total_installments = null;
+      updates.installment_group_id = null;
+      updates.installment_number = null;
+    }
+
+    const { error } = await supabase
+      .from('financial_items')
+      .update(updates)
       .eq('id', item.id);
 
     if (error) {
@@ -273,6 +414,10 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
     setCategory("");
     setBusinessUnitId(null);
     setDate("");
+    setCreditCard("");
+    setIsRecurring(false);
+    setIsInstallment(false);
+    setTotalInstallments(1);
     setShowAddCategory(false);
     setShowManageCategories(false);
     setEditingCategoryId(null);
@@ -297,6 +442,11 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
             <Select value={type} onValueChange={(value) => {
               setType(value);
               setCategory('');
+              if (value !== 'saida') {
+                setIsRecurring(false);
+                setIsInstallment(false);
+                setCreditCard('');
+              }
             }} required>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo" />
@@ -502,6 +652,114 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
               required
             />
           </div>
+
+          {type === 'saida' && (
+            <>
+              <div className="space-y-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                <h3 className="font-semibold text-sm text-blue-900 flex items-center gap-2">
+                  <CreditCardIcon className="h-4 w-4" />
+                  Tipo de Lançamento
+                </h3>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit-is-recurring"
+                    checked={isRecurring}
+                    onCheckedChange={(checked) => {
+                      const value = !!checked;
+                      setIsRecurring(value);
+                      if (value) {
+                        setIsInstallment(false);
+                      }
+                    }}
+                    disabled={isInstallment}
+                  />
+                  <Label htmlFor="edit-is-recurring" className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Repeat className="h-4 w-4 text-blue-600" />
+                    Conta Recorrente (repete todo mês)
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit-is-installment"
+                    checked={isInstallment}
+                    onCheckedChange={(checked) => {
+                      const value = !!checked;
+                      setIsInstallment(value);
+                      if (value) {
+                        setIsRecurring(false);
+                        setTotalInstallments((prev) => Math.max(prev, 2));
+                      }
+                    }}
+                    disabled={isRecurring}
+                  />
+                  <Label htmlFor="edit-is-installment" className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Calendar className="h-4 w-4 text-purple-600" />
+                    Compra Parcelada
+                  </Label>
+                </div>
+
+                {isInstallment && (
+                  <div>
+                    <Label>Quantidade de Parcelas</Label>
+                    <Select
+                      value={String(totalInstallments)}
+                      onValueChange={(value) => {
+                        const parsed = parseInt(value, 10);
+                        setTotalInstallments(Number.isNaN(parsed) ? 2 : parsed);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24].map((num) => (
+                          <SelectItem key={num} value={String(num)}>
+                            {num}x de R$ {amount ? (parseFloat(amount) / num).toFixed(2) : '0.00'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <CreditCardIcon className="h-4 w-4" />
+                  Cartão de Crédito (opcional)
+                </Label>
+                <Select
+                  value={creditCard || 'none'}
+                  onValueChange={(value) => setCreditCard(value === 'none' ? '' : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um cartão" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum (pagamento direto)</SelectItem>
+                    {creditCards.map((card) => (
+                      <SelectItem key={card.id} value={card.name}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
+                          {card.name}
+                          <span className="text-xs text-gray-500">
+                            (Venc: dia {card.due_day})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!isLoadingCreditCards && creditCards.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    Nenhum cartão cadastrado. Adicione cartões na página de Cartões.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           <div>
             <Label htmlFor="date">Data</Label>

@@ -8,6 +8,7 @@ import PDFImportModal from "@/components/PDFImportModal";
 
 import LancamentosHeader from "./LancamentosHeader";
 import LancamentosContent from "./LancamentosContent";
+import { generateRecurringExpensesForMonth } from "@/utils/recurringExpensesScheduler";
 
 const LancamentosContainer = () => {
   const [user, setUser] = useState<any>(null);
@@ -45,6 +46,33 @@ const LancamentosContainer = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id || periodType !== 'month') {
+      return;
+    }
+
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth() + 1;
+    let isActive = true;
+
+    const syncRecurringExpenses = async () => {
+      try {
+        const generated = await generateRecurringExpensesForMonth(user.id, year, month);
+        if (generated && isActive) {
+          await refetch();
+        }
+      } catch (error) {
+        console.error('Erro ao gerar recorrentes para o mês selecionado:', error);
+      }
+    };
+
+    void syncRecurringExpenses();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id, selectedMonth, periodType, refetch]);
 
   if (!user) {
     return <Auth onAuthChange={setUser} />;

@@ -50,8 +50,14 @@ const InvoiceDetailModal = ({
     queryFn: async () => {
       if (!invoice) return [];
 
-      const startOfMonth = new Date(invoice.reference_month);
-      const endOfMonth = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0);
+      // Parse reference_month (formato: YYYY-MM-DD)
+      const refMonth = invoice.reference_month;
+      const [year, month] = refMonth.split('-').map(Number);
+
+      // Primeiro e último dia do mês
+      const startOfMonth = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endOfMonth = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
       const { data, error } = await supabase
         .from('financial_items')
@@ -59,8 +65,8 @@ const InvoiceDetailModal = ({
         .eq('user_id', userId)
         .eq('credit_card', invoice.card_name)
         .eq('type', 'saida')
-        .gte('date', startOfMonth.toISOString())
-        .lte('date', endOfMonth.toISOString())
+        .gte('date', startOfMonth)
+        .lte('date', endOfMonth)
         .order('date', { ascending: true });
 
       if (error) throw error;
@@ -94,8 +100,9 @@ const InvoiceDetailModal = ({
 
     try {
       await markAsPaid.mutateAsync({
-        creditCardId: invoice.credit_card_id,
+        cardId: invoice.credit_card_id,
         referenceMonth: invoice.reference_month,
+        paid: true,
       });
 
       toast({
@@ -120,7 +127,7 @@ const InvoiceDetailModal = ({
     setIsSavingNote(true);
     try {
       await addNote.mutateAsync({
-        creditCardId: invoice.credit_card_id,
+        cardId: invoice.credit_card_id,
         referenceMonth: invoice.reference_month,
         note: notes.trim(),
       });

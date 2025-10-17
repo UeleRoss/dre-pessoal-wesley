@@ -1,9 +1,8 @@
-
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Edit, Trash2, Repeat, Calendar, CreditCard, AlertTriangle } from "lucide-react";
-import { formatBrazilDate, formatBrazilDateTime } from "@/utils/dateUtils";
+import { formatBrazilDate } from "@/utils/dateUtils";
 import { FinancialItem } from "@/types/financial";
 import {
   AlertDialog,
@@ -29,147 +28,141 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
   const isExpenseSummary = item.source === 'financial_summary';
   const isIncomeSummary = item.source === 'financial_summary_income';
   const isSummary = isExpenseSummary || isIncomeSummary;
-  
-  // Log para debug
-  if (isIncomeSummary) {
-    console.log("💰 Renderizando receita:", item);
-  }
-  
-  const getBadgeColor = () => {
-    if (isIncomeSummary) return 'bg-green-100 text-green-800 border-green-200';
-    if (isExpenseSummary) return 'bg-blue-100 text-blue-800 border-blue-200';
-    return '';
-  };
-  
+
   const getRowBgColor = () => {
     if (item.needs_review) return 'bg-yellow-50 border-yellow-300';
     if (isIncomeSummary) return 'bg-green-50 border-green-200';
     if (isExpenseSummary) return 'bg-blue-50 border-blue-200';
-    return '';
+    return 'bg-white';
   };
-  
+
   return (
-    <div className={`flex flex-col md:flex-row md:items-center md:justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50 ${getRowBgColor()} gap-3`}>
-      <div className="flex items-start md:items-center gap-2 md:gap-3 flex-1">
-        <div className="mt-1 md:mt-0">
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={(checked) => onSelect(item.id, checked as boolean)}
-          />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <Badge variant={item.type === 'entrada' ? 'default' : 'destructive'} className="text-xs">
-              {item.type === 'entrada' ? 'Entrada' : 'Saída'}
-            </Badge>
-
-            {/* Badge: Precisa Revisão */}
-            {item.needs_review && (
-              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800 border-yellow-400 animate-pulse">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Precisa Revisão
-              </Badge>
-            )}
-
-            {isIncomeSummary && (
-              <Badge variant="outline" className={`${getBadgeColor()} text-xs`}>
-                Resumo de Receitas
-              </Badge>
-            )}
-            {isExpenseSummary && (
-              <Badge variant="outline" className={`${getBadgeColor()} text-xs`}>
-                Resumo de Gastos
-              </Badge>
-            )}
-
-            {/* Badge: Recorrente */}
-            {item.is_recurring && (
-              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
-                <Repeat className="h-3 w-3 mr-1" />
-                Recorrente
-              </Badge>
-            )}
-
-            {/* Badge: Parcelado */}
-            {item.is_installment && (
-              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-300">
-                <Calendar className="h-3 w-3 mr-1" />
-                {item.installment_number}/{item.total_installments}
-              </Badge>
-            )}
-
-            {/* Badge: Cartão de Crédito */}
-            {item.credit_card && (
-              <Badge variant="outline" className="text-xs bg-pink-50 text-pink-700 border-pink-300">
-                <CreditCard className="h-3 w-3 mr-1" />
-                {item.credit_card}
-              </Badge>
-            )}
-          </div>
-
-          <div className="font-medium text-sm md:text-base mb-2 break-words">{item.description}</div>
-
-          <div className="text-xs md:text-sm text-gray-600 flex flex-col md:flex-row md:flex-wrap gap-1 md:gap-4">
-            <span>📅 {isSummary ? `${formatBrazilDate(item.date)} (mês todo)` : formatBrazilDate(item.date)}</span>
-            <span>🏷️ {item.category}</span>
-            <span>🏦 {item.bank}</span>
-            {item.source && !isSummary && <span>📁 {item.source}</span>}
-          </div>
-
-          <div className="text-xs text-gray-400 mt-1">
-            {isSummary ? 'Dados históricos agregados' : `Criado em: ${formatBrazilDateTime(item.created_at)}`}
-            {item.imported_from && (
-              <span className="ml-2 text-yellow-600">📄 {item.imported_from}</span>
-            )}
-          </div>
+    <div
+      className={`flex items-center gap-3 p-2.5 border rounded-lg hover:shadow-sm transition-all ${getRowBgColor()}`}
+    >
+      {/* Checkbox + Data */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={(checked) => onSelect(item.id, checked as boolean)}
+        />
+        <div className="text-xs text-gray-600 font-medium min-w-[38px]">
+          {formatBrazilDate(item.date).slice(0, 5)}
         </div>
       </div>
 
-      <div className="flex items-center justify-between md:justify-end gap-3 md:gap-4 border-t md:border-t-0 pt-3 md:pt-0">
-        <div className="text-left md:text-right">
-          <div className={`text-base md:text-lg font-bold ${
-            item.type === 'entrada' ? 'text-green-600' : 'text-red-600'
-          }`}>
-            {item.type === 'entrada' ? '+' : '-'} {Number(item.amount).toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            })}
+      {/* Conteúdo Principal */}
+      <div className="flex-1 min-w-0 flex items-center gap-3">
+        {/* Nome/Descrição + Metadados */}
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-gray-900 truncate mb-0.5">
+            {item.description}
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="truncate max-w-[120px]">{item.category}</span>
+            <span className="text-gray-300">•</span>
+            <span className="truncate max-w-[100px]">{item.bank}</span>
+            {item.imported_from && (
+              <>
+                <span className="text-gray-300">•</span>
+                <span className="text-yellow-600 truncate max-w-[80px] text-[10px]">
+                  {item.imported_from}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex gap-1 md:gap-2">
+        {/* Badges/Indicadores */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {item.needs_review && (
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-yellow-100 text-yellow-800 border-yellow-400">
+              <AlertTriangle className="h-3 w-3" />
+            </Badge>
+          )}
+
+          {item.is_recurring && (
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-blue-50 text-blue-700 border-blue-300">
+              <Repeat className="h-3 w-3" />
+            </Badge>
+          )}
+
+          {item.is_installment && (
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-purple-50 text-purple-700 border-purple-300">
+              <Calendar className="h-3 w-3 mr-0.5" />
+              {item.installment_number}/{item.total_installments}
+            </Badge>
+          )}
+
+          {item.credit_card && (
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-pink-50 text-pink-700 border-pink-300 max-w-[80px] truncate">
+              <CreditCard className="h-3 w-3 mr-0.5 flex-shrink-0" />
+              <span className="truncate">{item.credit_card}</span>
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Tipo + Valor + Ações */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Badge
+          variant={item.type === 'entrada' ? 'default' : 'destructive'}
+          className="text-[10px] h-5 w-14 justify-center"
+        >
+          {item.type === 'entrada' ? 'Entrada' : 'Saída'}
+        </Badge>
+
+        <div
+          className={`text-sm font-semibold min-w-[90px] text-right ${
+            item.type === 'entrada' ? 'text-green-600' : 'text-red-600'
+          }`}
+        >
+          {item.type === 'entrada' ? '+' : '-'}{' '}
+          {Number(item.amount)
+            .toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL'
+            })
+            .replace('R$', 'R$')}
+        </div>
+
+        <div className="flex gap-1">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onEdit(item)}
             disabled={isSummary}
-            title={isSummary ? "Resumos não podem ser editados" : "Editar lançamento"}
-            className="h-8 w-8 md:h-9 md:w-9 p-0"
+            title={isSummary ? "Resumos não podem ser editados" : "Editar"}
+            className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-700"
           >
-            <Edit className="h-3 w-3 md:h-4 md:w-4" />
+            <Edit className="h-3.5 w-3.5" />
           </Button>
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-red-600 h-8 w-8 md:h-9 md:w-9 p-0">
-                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:bg-red-100 hover:text-red-700 h-7 w-7 p-0"
+                title="Excluir"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-[90vw] md:max-w-md">
+            <AlertDialogContent className="max-w-md">
               <AlertDialogHeader>
-                <AlertDialogTitle className="text-base md:text-lg">
+                <AlertDialogTitle>
                   Excluir {isIncomeSummary ? 'Resumo de Receitas' : isExpenseSummary ? 'Resumo de Gastos' : 'Lançamento'}
                 </AlertDialogTitle>
-                <AlertDialogDescription className="text-sm">
+                <AlertDialogDescription>
                   Tem certeza que deseja excluir este {isSummary ? 'resumo' : 'lançamento'}? Esta ação não pode ser desfeita.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter className="flex-col md:flex-row gap-2">
-                <AlertDialogCancel className="w-full md:w-auto">Cancelar</AlertDialogCancel>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => onDelete(item.id)}
-                  className="bg-red-600 hover:bg-red-700 w-full md:w-auto"
+                  className="bg-red-600 hover:bg-red-700"
                 >
                   Excluir
                 </AlertDialogAction>

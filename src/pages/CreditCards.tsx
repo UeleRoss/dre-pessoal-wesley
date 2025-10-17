@@ -3,17 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCreditCards } from "@/hooks/useCreditCards";
 import { useInvoices } from "@/hooks/useInvoices";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Plus, Loader2, Settings } from "lucide-react";
+import { CreditCard, Plus, Loader2, Settings, Edit } from "lucide-react";
 import InvoiceCard from "@/components/InvoiceCard";
 import AddCreditCardModal from "@/components/AddCreditCardModal";
 import InvoiceDetailModal from "@/components/InvoiceDetailModal";
-import { CreditCardInvoice } from "@/types/financial";
+import type { CreditCard as CreditCardEntity, CreditCardInvoice } from "@/types/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CreditCards = () => {
   const [user, setUser] = useState<any>(null);
-  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+  const [cardModalMode, setCardModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedCard, setSelectedCard] = useState<CreditCardEntity | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<CreditCardInvoice | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
@@ -83,7 +85,13 @@ const CreditCards = () => {
           </h1>
           <p className="text-gray-600 mt-1">Gerencie suas faturas e cartões</p>
         </div>
-        <Button onClick={() => setShowAddCardModal(true)}>
+        <Button
+          onClick={() => {
+            setCardModalMode('create');
+            setSelectedCard(null);
+            setIsCardModalOpen(true);
+          }}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Novo Cartão
         </Button>
@@ -242,6 +250,19 @@ const CreditCards = () => {
                       </div>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-blue-600 hover:text-blue-700"
+                    title="Editar cartão"
+                    onClick={() => {
+                      setCardModalMode('edit');
+                      setSelectedCard(card);
+                      setIsCardModalOpen(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -251,10 +272,16 @@ const CreditCards = () => {
 
       {/* Modals */}
       <AddCreditCardModal
-        isOpen={showAddCardModal}
-        onClose={() => setShowAddCardModal(false)}
+        isOpen={isCardModalOpen}
+        onClose={() => {
+          setIsCardModalOpen(false);
+          setSelectedCard(null);
+          setCardModalMode('create');
+        }}
         onSuccess={refetchInvoices}
         userId={user.id}
+        mode={cardModalMode}
+        card={selectedCard}
       />
 
       <InvoiceDetailModal
