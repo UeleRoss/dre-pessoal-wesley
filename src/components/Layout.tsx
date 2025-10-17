@@ -74,7 +74,7 @@ const Layout = () => {
             </div>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-1">
+            <nav className="hidden lg:flex items-center space-x-1">
               {navigation.map((item) => {
                 const isActive = location.pathname === item.href;
                 return (
@@ -107,7 +107,7 @@ const Layout = () => {
         </div>
 
         {/* Mobile Navigation */}
-        <div className="md:hidden border-t border-navy-600">
+        <div className="lg:hidden border-t border-navy-600">
           <div className="w-full px-4">
             <div className="flex justify-around py-2">
               {navigation.map((item) => {

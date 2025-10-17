@@ -14,12 +14,7 @@ import { Edit } from "lucide-react";
 import { useState } from "react";
 
 import { FinancialItem } from "@/types/financial";
-
-const CATEGORIES = [
-  "Apartamento", "Carro", "Comida", "Contas Mensais", "Entre bancos", "Escritório", 
-  "Estudos", "Go On Outdoor", "Imposto", "Investimentos", "Lazer e ócio", 
-  "Pro-Labore", "Vida esportiva", "Anúncios Online", "Itens Físicos"
-];
+import { DEFAULT_CATEGORIES } from "@/constants/categories";
 
 const BANKS = ['CONTA SIMPLES', 'BRADESCO', 'C6 BANK', 'ASAAS', 'NOMAD'];
 
@@ -81,7 +76,7 @@ const LancamentosContent = ({
           filterBank={lancamentosState.filterBank}
           onBankChange={lancamentosState.setFilterBank}
           onClearFilters={lancamentosState.handleClearFilters}
-          categories={CATEGORIES}
+          categories={DEFAULT_CATEGORIES}
           banks={BANKS}
         />
       </div>

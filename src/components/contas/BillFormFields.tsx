@@ -45,7 +45,12 @@ export const BillFormFields = ({ formData, onInputChange }: BillFormFieldsProps)
   });
 
   // Use safe values for selects - never empty strings
-  const safeCategory = formData.category && CATEGORIES.includes(formData.category) ? formData.category : undefined;
+  const categoryMatch = formData.category
+    ? CATEGORIES.find((category) =>
+        category.localeCompare(formData.category, "pt-BR", { sensitivity: "accent" }) === 0
+      )
+    : undefined;
+  const safeCategory = categoryMatch || undefined;
   const safeBank = formData.bank === "NONE" || (formData.bank && userBanks.includes(formData.bank)) ? formData.bank : undefined;
 
   return (

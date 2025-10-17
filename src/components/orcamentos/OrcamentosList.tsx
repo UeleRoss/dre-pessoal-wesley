@@ -6,7 +6,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 interface Orcamento {
   id: string;
-  category: string;
+  business_unit_id: string;
+  business_unit_name: string;
   limit_amount: number;
   month: string;
   alert_threshold?: number;
@@ -14,12 +15,12 @@ interface Orcamento {
 
 interface OrcamentosListProps {
   orcamentos: Orcamento[];
-  gastosPorCategoria: Record<string, number>;
+  gastosPorUnidade: Record<string, number>;
   onEdit: (orcamento: Orcamento) => void;
   onDelete: (id: string) => void;
 }
 
-const OrcamentosList = ({ orcamentos, gastosPorCategoria, onEdit, onDelete }: OrcamentosListProps) => {
+const OrcamentosList = ({ orcamentos, gastosPorUnidade, onEdit, onDelete }: OrcamentosListProps) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -46,7 +47,7 @@ const OrcamentosList = ({ orcamentos, gastosPorCategoria, onEdit, onDelete }: Or
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Categoria</TableHead>
+              <TableHead>Unidade de Negócio</TableHead>
               <TableHead className="text-right">Limite</TableHead>
               <TableHead className="text-right">Gasto</TableHead>
               <TableHead className="text-right">Disponível</TableHead>
@@ -56,18 +57,19 @@ const OrcamentosList = ({ orcamentos, gastosPorCategoria, onEdit, onDelete }: Or
           </TableHeader>
           <TableBody>
             {orcamentos.map((orcamento) => {
-              const gasto = gastosPorCategoria[orcamento.category] || 0;
+              const gasto = gastosPorUnidade[orcamento.business_unit_id] || 0;
               const disponivel = orcamento.limit_amount - gasto;
+              const alertThreshold = orcamento.alert_threshold || 80;
 
               return (
                 <TableRow key={orcamento.id}>
-                  <TableCell className="font-medium">{orcamento.category}</TableCell>
+                  <TableCell className="font-medium">{orcamento.business_unit_name}</TableCell>
                   <TableCell className="text-right">{formatCurrency(orcamento.limit_amount)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(gasto)}</TableCell>
                   <TableCell className={`text-right font-medium ${disponivel >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(disponivel)}
                   </TableCell>
-                  <TableCell className="text-center">{orcamento.alert_threshold || 80}%</TableCell>
+                  <TableCell className="text-center">{alertThreshold}%</TableCell>
                   <TableCell>
                     <div className="flex justify-center gap-2">
                       <Button
@@ -87,7 +89,7 @@ const OrcamentosList = ({ orcamentos, gastosPorCategoria, onEdit, onDelete }: Or
                           <AlertDialogHeader>
                             <AlertDialogTitle>Excluir Meta</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Tem certeza que deseja excluir a meta da categoria "{orcamento.category}"?
+                              Tem certeza que deseja excluir a meta da unidade "{orcamento.business_unit_name}"?
                               Esta ação não pode ser desfeita.
                             </AlertDialogDescription>
                           </AlertDialogHeader>

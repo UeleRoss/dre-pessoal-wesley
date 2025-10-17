@@ -1,50 +1,46 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import type { BusinessUnit } from "@/types/business-unit";
 
 interface NewOrcamentoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: { business_unit_id: string; limit_amount: number; alert_threshold: number }) => void;
   isLoading: boolean;
+  businessUnits: BusinessUnit[];
 }
 
-const NewOrcamentoModal = ({ open, onOpenChange, onSubmit, isLoading }: NewOrcamentoModalProps) => {
-  const [category, setCategory] = useState("");
+const NewOrcamentoModal = ({ open, onOpenChange, onSubmit, isLoading, businessUnits }: NewOrcamentoModalProps) => {
+  const [businessUnitId, setBusinessUnitId] = useState("");
   const [limitAmount, setLimitAmount] = useState("");
   const [alertThreshold, setAlertThreshold] = useState("80");
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('name')
-        .order('name');
-
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const hasBusinessUnits = businessUnits.length > 0;
+  const selectedBusinessUnitName = useMemo(() => {
+    return businessUnits.find((unit) => unit.id === businessUnitId)?.name ?? "";
+  }, [businessUnits, businessUnitId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!category || !limitAmount) return;
+    if (!businessUnitId || !limitAmount) return;
+    const parsedLimit = parseFloat(limitAmount);
+    if (Number.isNaN(parsedLimit) || parsedLimit <= 0) return;
+
+    const parsedAlert = parseInt(alertThreshold || "0", 10);
 
     onSubmit({
-      category,
-      limit_amount: parseFloat(limitAmount),
-      alert_threshold: parseInt(alertThreshold),
+      business_unit_id: businessUnitId,
+      limit_amount: parsedLimit,
+      alert_threshold: Number.isNaN(parsedAlert) ? 80 : parsedAlert,
     });
 
     // Reset form
-    setCategory("");
+    setBusinessUnitId("");
     setLimitAmount("");
     setAlertThreshold("80");
   };
@@ -57,19 +53,34 @@ const NewOrcamentoModal = ({ open, onOpenChange, onSubmit, isLoading }: NewOrcam
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="category">Categoria</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Label htmlFor="businessUnit">Unidade de Negócio</Label>
+            <Select
+              value={businessUnitId}
+              onValueChange={setBusinessUnitId}
+              disabled={!hasBusinessUnits}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione uma categoria" />
+                <SelectValue placeholder={hasBusinessUnits ? "Selecione uma unidade" : "Cadastre uma unidade primeiro"} />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat: any) => (
-                  <SelectItem key={cat.name} value={cat.name}>
-                    {cat.name}
+                {businessUnits.map((unit) => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: unit.color }}
+                      />
+                      {unit.name}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {!hasBusinessUnits && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Cadastre unidades de negócio na tela de Lançamentos para criar metas.
+              </p>
+            )}
           </div>
 
           <div>
@@ -109,8 +120,11 @@ const NewOrcamentoModal = ({ open, onOpenChange, onSubmit, isLoading }: NewOrcam
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Criando...' : 'Criar Meta'}
+            <Button
+              type="submit"
+              disabled={isLoading || !hasBusinessUnits || !businessUnitId}
+            >
+              {isLoading ? 'Criando...' : selectedBusinessUnitName ? `Criar Meta para ${selectedBusinessUnitName}` : 'Criar Meta'}
             </Button>
           </div>
         </form>

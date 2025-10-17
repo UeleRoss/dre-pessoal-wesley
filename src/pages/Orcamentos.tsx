@@ -26,7 +26,8 @@ const Orcamentos = () => {
 
   const {
     orcamentos,
-    gastosPorCategoria,
+    gastosPorUnidade,
+    businessUnits,
     createOrcamentoMutation,
     updateOrcamentoMutation,
     deleteOrcamentoMutation
@@ -46,12 +47,12 @@ const Orcamentos = () => {
 
       <OrcamentosProgress
         orcamentos={orcamentos}
-        gastosPorCategoria={gastosPorCategoria}
+        gastosPorUnidade={gastosPorUnidade}
       />
 
       <OrcamentosList
         orcamentos={orcamentos}
-        gastosPorCategoria={gastosPorCategoria}
+        gastosPorUnidade={gastosPorUnidade}
         onEdit={(orcamento) => console.log('Edit', orcamento)}
         onDelete={(id) => deleteOrcamentoMutation.mutate(id)}
       />
@@ -64,6 +65,7 @@ const Orcamentos = () => {
           setShowNewModal(false);
         }}
         isLoading={createOrcamentoMutation.isPending}
+        businessUnits={businessUnits}
       />
     </div>
   );

@@ -4,7 +4,8 @@ import { AlertCircle, CheckCircle, TrendingUp } from "lucide-react";
 
 interface Orcamento {
   id: string;
-  category: string;
+  business_unit_id: string;
+  business_unit_name: string;
   limit_amount: number;
   month: string;
   alert_threshold?: number;
@@ -12,21 +13,15 @@ interface Orcamento {
 
 interface OrcamentosProgressProps {
   orcamentos: Orcamento[];
-  gastosPorCategoria: Record<string, number>;
+  gastosPorUnidade: Record<string, number>;
 }
 
-const OrcamentosProgress = ({ orcamentos, gastosPorCategoria }: OrcamentosProgressProps) => {
+const OrcamentosProgress = ({ orcamentos, gastosPorUnidade }: OrcamentosProgressProps) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
-
-  const getProgressColor = (percentage: number, alertThreshold: number = 80) => {
-    if (percentage >= 100) return 'bg-red-500';
-    if (percentage >= alertThreshold) return 'bg-orange-500';
-    return 'bg-green-500';
   };
 
   const getStatusIcon = (percentage: number, alertThreshold: number = 80) => {
@@ -36,7 +31,10 @@ const OrcamentosProgress = ({ orcamentos, gastosPorCategoria }: OrcamentosProgre
   };
 
   const totalOrcamento = orcamentos.reduce((sum, orc) => sum + orc.limit_amount, 0);
-  const totalGasto = Object.values(gastosPorCategoria).reduce((sum, val) => sum + val, 0);
+  const totalGasto = orcamentos.reduce((sum, orc) => {
+    const gasto = gastosPorUnidade[orc.business_unit_id] || 0;
+    return sum + gasto;
+  }, 0);
   const percentualGeral = totalOrcamento > 0 ? (totalGasto / totalOrcamento) * 100 : 0;
 
   return (
@@ -74,18 +72,20 @@ const OrcamentosProgress = ({ orcamentos, gastosPorCategoria }: OrcamentosProgre
         </CardContent>
       </Card>
 
-      {/* Cards individuais por categoria */}
+      {/* Cards individuais por unidade */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {orcamentos.map((orcamento) => {
-          const gasto = gastosPorCategoria[orcamento.category] || 0;
-          const percentual = (gasto / orcamento.limit_amount) * 100;
+          const gasto = gastosPorUnidade[orcamento.business_unit_id] || 0;
+          const percentual = orcamento.limit_amount > 0
+            ? (gasto / orcamento.limit_amount) * 100
+            : 0;
           const alertThreshold = orcamento.alert_threshold || 80;
 
           return (
             <Card key={orcamento.id}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center justify-between">
-                  <span>{orcamento.category}</span>
+                  <span>{orcamento.business_unit_name}</span>
                   {getStatusIcon(percentual, alertThreshold)}
                 </CardTitle>
               </CardHeader>

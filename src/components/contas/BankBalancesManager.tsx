@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BankBalanceRow = Database["public"]["Tables"]["bank_balances"]["Row"];
@@ -40,6 +41,7 @@ const BankBalancesManager = ({
   isSaving
 }: BankBalancesManagerProps) => {
   const { toast } = useToast();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const availableBanks = useMemo(() => {
     const normalizedBanks = new Map<string, string>();
@@ -171,6 +173,7 @@ const BankBalancesManager = ({
         title: "Saldos atualizados",
         description: "Os valores base foram salvos com sucesso.",
       });
+      setIsExpanded(false); // Colapsa após salvar
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado ao salvar.";
       toast({
@@ -184,13 +187,36 @@ const BankBalancesManager = ({
   return (
     <Card className="border-navy-100">
       <CardHeader>
-        <CardTitle className="text-lg">Controle de Saldos por Banco</CardTitle>
-        <CardDescription>
-          Informe o saldo real de cada banco e a data de referência. A partir dessa data, o sistema soma os lançamentos
-          futuros para projetar o saldo atual.
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg">Controle de Saldos por Banco</CardTitle>
+            <CardDescription>
+              Informe o saldo real de cada banco e a data de referência. A partir dessa data, o sistema soma os lançamentos
+              futuros para projetar o saldo atual.
+            </CardDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="ml-4"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-4 w-4 mr-1" />
+                Recolher
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4 mr-1" />
+                Expandir
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      {isExpanded && (
+        <CardContent className="space-y-6">
         <div className="grid gap-4">
           {availableBanks.map((bank) => {
             const entry = formState[bank];
@@ -248,6 +274,7 @@ const BankBalancesManager = ({
           </Button>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 };

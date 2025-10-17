@@ -1,0 +1,18 @@
+export const DEFAULT_CATEGORIES = [
+  "Apartamento",
+  "Carro",
+  "Comida",
+  "Contas Mensais",
+  "Entre bancos",
+  "Escritório",
+  "Estudos",
+  "Go On Outdoor",
+  "Imposto",
+  "Investimentos",
+  "Lazer e ócio",
+  "Pro-Labore",
+  "Vida esportiva",
+  "Anúncios Online",
+  "Tráfego Pago",
+  "Itens Físicos",
+];
