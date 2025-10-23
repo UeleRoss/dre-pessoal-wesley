@@ -54,7 +54,8 @@ export const useInvoices = (userId: string, month?: string) => {
           .eq('credit_card', cardName)
           .gte('date', startDate)
           .lte('date', endDate)
-          .order('date');
+          .order('purchase_date', { ascending: true, nullsFirst: false })
+          .order('date', { ascending: true, nullsFirst: false });
 
         if (error) throw error;
         return data || [];

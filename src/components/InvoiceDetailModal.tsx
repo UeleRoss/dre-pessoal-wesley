@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { CreditCardInvoice, FinancialItem } from "@/types/financial";
 import { formatBrazilDate } from "@/utils/dateUtils";
+import { formatInvoiceMonth } from "@/utils/creditCardUtils";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -235,39 +236,64 @@ const InvoiceDetailModal = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {invoiceItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium">{item.description}</span>
-                        {item.is_recurring && (
-                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
-                            <Repeat className="h-3 w-3 mr-1" />
-                            Recorrente
-                          </Badge>
-                        )}
-                        {item.is_installment && (
-                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-300">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {item.installment_number}/{item.total_installments}
-                          </Badge>
-                        )}
+                {invoiceItems.map((item) => {
+                  const purchaseDateLabel = item.purchase_date
+                    ? formatBrazilDate(item.purchase_date)
+                    : null;
+                  const invoiceMonthLabel = item.purchase_date
+                    ? formatInvoiceMonth(item.date)
+                    : null;
+                  const isCreditPurchase = item.purchase_date
+                    ? new Date(item.purchase_date).getTime() !== new Date(item.date).getTime()
+                    : false;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium">{item.description}</span>
+                          {item.is_recurring && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
+                              <Repeat className="h-3 w-3 mr-1" />
+                              Recorrente
+                            </Badge>
+                          )}
+                          {item.is_installment && (
+                            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-300">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {item.installment_number}/{item.total_installments}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600 flex flex-wrap items-center gap-1">
+                          {purchaseDateLabel && invoiceMonthLabel && isCreditPurchase ? (
+                            <>
+                              <span>Compra: {purchaseDateLabel}</span>
+                              <span className="text-gray-300">•</span>
+                              <span>Fatura: {invoiceMonthLabel}</span>
+                              <span className="text-gray-300">•</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{formatBrazilDate(item.date)}</span>
+                              <span className="text-gray-300">•</span>
+                            </>
+                          )}
+                          <span>{item.category}</span>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {formatBrazilDate(item.date)} • {item.category}
+                      <div className="text-lg font-semibold text-red-600">
+                        {Number(item.amount).toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL'
+                        })}
                       </div>
                     </div>
-                    <div className="text-lg font-semibold text-red-600">
-                      {Number(item.amount).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

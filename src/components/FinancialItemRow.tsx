@@ -41,6 +41,21 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
     currency: 'BRL'
   });
 
+  const purchaseDateObj = item.purchase_date ? new Date(item.purchase_date) : null;
+  const itemDateObj = item.date ? new Date(item.date) : null;
+  const hasCreditPurchase = Boolean(
+    item.credit_card &&
+    purchaseDateObj &&
+    itemDateObj &&
+    purchaseDateObj.getTime() !== itemDateObj.getTime()
+  );
+  const purchaseDateLabel = hasCreditPurchase && item.purchase_date
+    ? formatBrazilDate(item.purchase_date)
+    : null;
+  const invoiceMonthLabel = hasCreditPurchase && itemDateObj
+    ? itemDateObj.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
+    : null;
+
   return (
     <div
       className={`p-2.5 border rounded-lg hover:shadow-sm transition-all ${getRowBgColor()}`}
@@ -87,9 +102,15 @@ const FinancialItemRow = ({ item, isSelected, onSelect, onEdit, onDelete }: Fina
                 </>
               )}
               <span className="text-gray-300">•</span>
-              <div className="font-medium">
-                {formatBrazilDate(item.date).slice(0, 5)}
-              </div>
+              {hasCreditPurchase ? (
+                <span className="text-xs text-gray-600">
+                  {purchaseDateLabel ? purchaseDateLabel.slice(0, 5) : ''} → {invoiceMonthLabel}
+                </span>
+              ) : (
+                <span className="font-medium">
+                  {formatBrazilDate(item.date).slice(0, 5)}
+                </span>
+              )}
             </div>
           </div>
         </div>

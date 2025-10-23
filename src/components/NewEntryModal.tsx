@@ -14,6 +14,7 @@ import { X, Plus, Trash2, Edit2, Check, CreditCard, Repeat, Calendar } from "luc
 import { useUnitCategories } from "@/hooks/useUnitCategories";
 import type { TransactionType } from "@/constants/default-categories";
 import type { BusinessUnit } from "@/types/business-unit";
+import { getInvoiceInfo } from "@/utils/creditCardUtils";
 
 interface NewEntryModalProps {
   isOpen: boolean;
@@ -56,6 +57,23 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     if (!formData.business_unit_id) return null;
     return businessUnits.find(unit => unit.id === formData.business_unit_id) || null;
   }, [businessUnits, formData.business_unit_id]);
+
+  const selectedCreditCard = useMemo(() => {
+    if (!formData.credit_card) return null;
+    return creditCards.find(card => card.name === formData.credit_card) || null;
+  }, [creditCards, formData.credit_card]);
+
+  const invoiceInfo = useMemo(() => {
+    if (!selectedCreditCard || selectedCreditCard.card_type !== 'credit' || !formData.date) {
+      return null;
+    }
+
+    try {
+      return getInvoiceInfo(formData.date, selectedCreditCard.closing_day, selectedCreditCard.due_day);
+    } catch {
+      return null;
+    }
+  }, [selectedCreditCard, formData.date]);
 
   const {
     categories: unitCategories,
@@ -252,8 +270,20 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
       return;
     }
 
+    if (!formData.date) {
+      toast({ title: "Erro", description: "Informe a data da compra", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      const purchaseDate = formData.date;
+      const isCreditCard = selectedCreditCard?.card_type === 'credit';
+      const transactionDate = isCreditCard && invoiceInfo?.referenceMonth
+        ? invoiceInfo.referenceMonth
+        : purchaseDate;
+      const purchaseDateValue = isCreditCard ? purchaseDate : null;
+
       if (formData.is_installment) {
         // === COMPRA PARCELADA ===
         const { error } = await supabase.rpc('create_installment_purchase', {
@@ -264,7 +294,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           p_category: formData.category,
           p_credit_card: formData.credit_card || null,
           p_business_unit_id: formData.business_unit_id,
-          p_start_date: formData.date,
+          p_start_date: purchaseDate,
           p_total_installments: formData.total_installments
         });
 
@@ -302,7 +332,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           description: formData.description,
           category: formData.category,
           bank: formData.credit_card || 'N/A',
-          date: formData.date,
+          date: transactionDate,
+          purchase_date: purchaseDateValue,
           business_unit_id: formData.business_unit_id,
           user_id: user.id,
           is_recurring: true,
@@ -326,7 +357,8 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           description: formData.description,
           category: formData.category,
           bank: formData.credit_card || 'N/A',
-          date: formData.date,
+          date: transactionDate,
+          purchase_date: purchaseDateValue,
           business_unit_id: formData.business_unit_id,
           credit_card: formData.credit_card || null,
           user_id: user.id,
@@ -639,33 +671,79 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um cartão" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum (pagamento direto)</SelectItem>
-                  {creditCards.map((card) => (
-                    <SelectItem key={card.id} value={card.name}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
-                        {card.name}
-                        <span className="text-xs text-gray-500">
-                          (Venc: dia {card.due_day})
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {creditCards.length === 0 && (
-                <p className="text-xs text-gray-500">
-                  Nenhum cartão cadastrado. Adicione cartões na página de Cartões.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div>
-            <Label>Data *</Label>
-            <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} required />
+              <SelectContent>
+                <SelectItem value="none">Nenhum (pagamento direto)</SelectItem>
+                {creditCards.map((card) => (
+                  <SelectItem key={card.id} value={card.name}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
+                      {card.name}
+                      <span className="text-xs text-gray-500">
+                        (Venc: dia {card.due_day})
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {creditCards.length === 0 && (
+              <p className="text-xs text-gray-500">
+                Nenhum cartão cadastrado. Adicione cartões na página de Cartões.
+              </p>
+            )}
+            {selectedCreditCard && (
+              <div
+                className={`rounded-md border p-3 text-sm ${
+                  selectedCreditCard.card_type === 'credit'
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-green-200 bg-green-50 text-green-700'
+                }`}
+              >
+                {selectedCreditCard.card_type === 'credit' ? (
+                  <div className="space-y-1">
+                    <p className="font-medium">Cartão de crédito</p>
+                    {formData.date && invoiceInfo ? (
+                      <p>
+                        Compra vai para a fatura de{" "}
+                        <span className="font-semibold">
+                          {invoiceInfo.invoiceMonth}
+                        </span>{" "}
+                        (vencimento em {invoiceInfo.dueDateFormatted}).
+                      </p>
+                    ) : (
+                      <p>Selecione a data da compra para ver a fatura e vencimento previstos.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium">Cartão pré-pago</p>
+                    <p>O valor será descontado imediatamente ao salvar este lançamento.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+        )}
+
+        <div>
+          <Label>Data *</Label>
+          <Input
+            type="date"
+            value={formData.date}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            required
+          />
+          {selectedCreditCard?.card_type === 'credit' ? (
+            <p className="text-xs text-blue-600 mt-1">
+              Informe a data real da compra. Usamos essa informação para posicionar a
+              despesa na fatura correta.
+            </p>
+          ) : formData.credit_card ? (
+            <p className="text-xs text-gray-500 mt-1">
+              Para cartões pré-pagos usamos esta data como data do pagamento.
+            </p>
+          ) : null}
+        </div>
 
           <div className="flex gap-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>

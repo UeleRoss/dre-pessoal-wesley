@@ -142,6 +142,7 @@ export type Database = {
       }
       credit_cards: {
         Row: {
+          card_type: string
           closing_day: number
           color: string
           created_at: string
@@ -154,6 +155,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          card_type?: string
           closing_day: number
           color?: string
           created_at?: string
@@ -166,6 +168,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          card_type?: string
           closing_day?: number
           color?: string
           created_at?: string
@@ -304,6 +307,7 @@ export type Database = {
           installment_number: number | null
           is_installment: boolean
           is_recurring: boolean
+          purchase_date: string | null
           recurring_status: string | null
           recurring_template_id: string | null
           source: string | null
@@ -326,6 +330,7 @@ export type Database = {
           installment_number?: number | null
           is_installment?: boolean
           is_recurring?: boolean
+          purchase_date?: string | null
           recurring_status?: string | null
           recurring_template_id?: string | null
           source?: string | null
@@ -348,6 +353,7 @@ export type Database = {
           installment_number?: number | null
           is_installment?: boolean
           is_recurring?: boolean
+          purchase_date?: string | null
           recurring_status?: string | null
           recurring_template_id?: string | null
           source?: string | null

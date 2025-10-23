@@ -14,6 +14,7 @@ import { useUnitCategories } from "@/hooks/useUnitCategories";
 import type { TransactionType } from "@/constants/default-categories";
 import type { BusinessUnit } from "@/types/business-unit";
 import { useCreditCards } from "@/hooks/useCreditCards";
+import { getInvoiceInfo } from "@/utils/creditCardUtils";
 
 interface FinancialItem {
   id: string;
@@ -33,6 +34,7 @@ interface FinancialItem {
   total_installments?: number | null;
   installment_group_id?: string | null;
   installment_number?: number | null;
+  purchase_date?: string | null;
 }
 
 interface EditEntryModalProps {
@@ -75,6 +77,23 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
     return businessUnits.find(unit => unit.id === businessUnitId) || null;
   }, [businessUnits, businessUnitId]);
 
+  const selectedCreditCard = useMemo(() => {
+    if (!creditCard) return null;
+    return creditCards.find(card => card.name === creditCard) || null;
+  }, [creditCards, creditCard]);
+
+  const invoiceInfo = useMemo(() => {
+    if (!selectedCreditCard || selectedCreditCard.card_type !== 'credit' || !date) {
+      return null;
+    }
+
+    try {
+      return getInvoiceInfo(date, selectedCreditCard.closing_day, selectedCreditCard.due_day);
+    } catch {
+      return null;
+    }
+  }, [selectedCreditCard, date]);
+
   const {
     categories: unitCategories,
     isLoading: isLoadingUnitCategories,
@@ -114,7 +133,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       setType(item.type);
       setCategory(item.category);
       setBusinessUnitId(item.business_unit_id || null);
-      setDate(item.date);
+      setDate(item.purchase_date || item.date);
       setCreditCard(item.credit_card || "");
       const isExpense = item.type === 'saida';
       setIsRecurring(isExpense ? !!item.is_recurring : false);
@@ -275,6 +294,15 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
     const applyRecurring = allowAdvancedOptions && isRecurring;
     const applyInstallment = allowAdvancedOptions && isInstallment;
 
+    if (!date) {
+      toast({
+        title: "Erro",
+        description: "Informe a data da compra",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (applyRecurring && !userId) {
       toast({
         title: "Erro",
@@ -284,13 +312,20 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       return;
     }
 
+    const isCreditCard = selectedCreditCard?.card_type === 'credit';
+    const transactionDate = isCreditCard && invoiceInfo?.referenceMonth
+      ? invoiceInfo.referenceMonth
+      : date;
+    const purchaseDateValue = isCreditCard ? date : null;
+
     const updates: Record<string, any> = {
       description,
       amount: parsedAmount,
       type,
       category,
       business_unit_id: businessUnitId,
-      date,
+      date: transactionDate,
+      purchase_date: purchaseDateValue,
       needs_review: false,
       updated_at: new Date().toISOString(),
       credit_card: allowAdvancedOptions && creditCard ? creditCard : null,
@@ -757,6 +792,29 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
                     Nenhum cartão cadastrado. Adicione cartões na página de Cartões.
                   </p>
                 )}
+                {selectedCreditCard && (
+                  <div
+                    className={`rounded-md border p-3 text-sm ${
+                      selectedCreditCard.card_type === 'credit'
+                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-green-200 bg-green-50 text-green-700'
+                    }`}
+                  >
+                    {selectedCreditCard.card_type === 'credit' ? (
+                      invoiceInfo ? (
+                        <p>
+                          Compra registrada como crédito. Fatura prevista:{" "}
+                          <span className="font-semibold">{invoiceInfo.invoiceMonth}</span>{" "}
+                          (vence em {invoiceInfo.dueDateFormatted}).
+                        </p>
+                      ) : (
+                        <p>Selecione a data da compra para calcular a fatura prevista.</p>
+                      )
+                    ) : (
+                      <p>Pré-pago: o saldo será ajustado imediatamente.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -770,6 +828,15 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
               onChange={(e) => setDate(e.target.value)}
               required
             />
+            {selectedCreditCard?.card_type === 'credit' ? (
+              <p className="text-xs text-blue-600 mt-1">
+                Esta é a data real da compra. Usaremos a fatura correta ao salvar.
+              </p>
+            ) : creditCard ? (
+              <p className="text-xs text-gray-500 mt-1">
+                Para cartões pré-pagos esta data representa o dia do pagamento.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex justify-end gap-3">
