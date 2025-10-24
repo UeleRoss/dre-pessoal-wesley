@@ -1,93 +1,100 @@
 
-import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Lancamentos from './pages/Lancamentos';
-import Contas from './pages/Contas';
-import Investimentos from './pages/Investimentos';
-import Orcamentos from './pages/Orcamentos';
-import FluxoCaixa from './pages/FluxoCaixa';
-import CreditCards from './pages/CreditCards';
-import NotFound from './pages/NotFound';
-import Auth from './components/Auth';
-import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import { useUserProfile } from './hooks/useUserProfile';
-import { Toaster } from './components/ui/toaster';
-import { checkAndGenerateRecurringExpenses } from './utils/recurringExpensesScheduler';
-import './App.css';
+import { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import Lancamentos from "./pages/Lancamentos";
+import Contas from "./pages/Contas";
+import Auth from "./components/Auth";
+import { Button } from "./components/ui/button";
+import { Toaster } from "./components/ui/toaster";
+import "./App.css";
 
 const queryClient = new QueryClient();
 
+const NavBar = ({ onLogout }: { onLogout: () => void }) => {
+  const location = useLocation();
+
+  const links = [
+    { to: "/lancamentos", label: "Lançamentos" },
+    { to: "/contas", label: "Contas" },
+  ];
+
+  return (
+    <header className="border-b bg-white">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+        <span className="text-lg font-semibold tracking-tight">Meu Financeiro V2</span>
+        <nav className="flex items-center gap-4">
+          {links.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className={`text-sm font-medium transition-colors ${
+                location.pathname === link.to ? "text-blue-600" : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        <Button variant="outline" size="sm" onClick={onLogout}>
+          Sair
+        </Button>
+      </div>
+    </header>
+  );
+};
+
 function AppContent() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const { profile, isLoading: isLoadingProfile } = useUserProfile();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      setLoading(false);
+      setIsLoading(false);
     });
 
-    // Listener para mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Gerar contas recorrentes automaticamente quando o usuário estiver autenticado
-  useEffect(() => {
-    if (user?.id && profile?.onboarding_completed) {
-      checkAndGenerateRecurringExpenses(user.id);
-    }
-  }, [user?.id, profile?.onboarding_completed]);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
-  // Mostrar loading enquanto verifica autenticação
-  if (loading || (user && isLoadingProfile)) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-50 to-navy-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-navy-600">Carregando...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-slate-100">
+        <div className="text-center text-slate-500">Carregando...</div>
       </div>
     );
   }
 
-  // Se não estiver autenticado, mostrar tela de login
   if (!user) {
     return <Auth onAuthChange={setUser} />;
   }
 
-  // Se estiver autenticado mas não completou o onboarding, mostrar onboarding
-  if (profile && !profile.onboarding_completed) {
-    return <OnboardingFlow onComplete={() => {
-      // Não precisa fazer nada aqui, o React Query vai atualizar automaticamente
-    }} />;
-  }
-
-  // Se tudo estiver ok, mostrar aplicação normal
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="lancamentos" element={<Lancamentos />} />
-          <Route path="contas" element={<Contas />} />
-          <Route path="investimentos" element={<Investimentos />} />
-          <Route path="orcamentos" element={<Orcamentos />} />
-          <Route path="fluxo-caixa" element={<FluxoCaixa />} />
-          <Route path="cartoes" element={<CreditCards />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
+      <NavBar onLogout={handleLogout} />
+      <main className="bg-slate-50">
+        <div className="mx-auto w-full max-w-6xl px-4 py-6">
+          <Routes>
+            <Route path="/" element={<Navigate to="/lancamentos" replace />} />
+            <Route path="/lancamentos" element={<Lancamentos user={user} />} />
+            <Route path="/contas" element={<Contas user={user} />} />
+            <Route path="*" element={<Navigate to="/lancamentos" replace />} />
+          </Routes>
+        </div>
+      </main>
       <Toaster />
     </Router>
   );

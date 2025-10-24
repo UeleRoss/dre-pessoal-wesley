@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import type { User } from "@supabase/supabase-js";
 
 interface AuthProps {
-  onAuthChange: (user: any) => void;
+  onAuthChange: (user: User | null) => void;
 }
 
 const Auth = ({ onAuthChange }: AuthProps) => {
@@ -57,10 +58,11 @@ const Auth = ({ onAuthChange }: AuthProps) => {
           description: "Verifique seu email para confirmar a conta.",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Tente novamente.";
       toast({
         title: "Erro",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
