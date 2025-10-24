@@ -83,7 +83,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
   }, [creditCards, creditCard]);
 
   const invoiceInfo = useMemo(() => {
-    if (!selectedCreditCard || selectedCreditCard.card_type !== 'credit' || !date) {
+    if (!selectedCreditCard || !date) {
       return null;
     }
 
@@ -312,11 +312,9 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       return;
     }
 
-    const isCreditCard = selectedCreditCard?.card_type === 'credit';
-    const transactionDate = isCreditCard && invoiceInfo?.referenceMonth
+    const transactionDate = selectedCreditCard && invoiceInfo?.referenceMonth
       ? invoiceInfo.referenceMonth
       : date;
-    const purchaseDateValue = isCreditCard ? date : null;
 
     const updates: Record<string, any> = {
       description,
@@ -793,25 +791,15 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
                   </p>
                 )}
                 {selectedCreditCard && (
-                  <div
-                    className={`rounded-md border p-3 text-sm ${
-                      selectedCreditCard.card_type === 'credit'
-                        ? 'border-blue-200 bg-blue-50 text-blue-700'
-                        : 'border-green-200 bg-green-50 text-green-700'
-                    }`}
-                  >
-                    {selectedCreditCard.card_type === 'credit' ? (
-                      invoiceInfo ? (
-                        <p>
-                          Compra registrada como crédito. Fatura prevista:{" "}
-                          <span className="font-semibold">{invoiceInfo.invoiceMonth}</span>{" "}
-                          (vence em {invoiceInfo.dueDateFormatted}).
-                        </p>
-                      ) : (
-                        <p>Selecione a data da compra para calcular a fatura prevista.</p>
-                      )
+                  <div className="rounded-md border p-3 text-sm border-blue-200 bg-blue-50 text-blue-700">
+                    {invoiceInfo ? (
+                      <p>
+                        Compra registrada como crédito. Fatura prevista:{" "}
+                        <span className="font-semibold">{invoiceInfo.invoiceMonth}</span>{" "}
+                        (vence em {invoiceInfo.dueDateFormatted}).
+                      </p>
                     ) : (
-                      <p>Pré-pago: o saldo será ajustado imediatamente.</p>
+                      <p>Selecione a data da compra para calcular a fatura prevista.</p>
                     )}
                   </div>
                 )}
@@ -828,15 +816,11 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
               onChange={(e) => setDate(e.target.value)}
               required
             />
-            {selectedCreditCard?.card_type === 'credit' ? (
+            {selectedCreditCard && (
               <p className="text-xs text-blue-600 mt-1">
                 Esta é a data real da compra. Usaremos a fatura correta ao salvar.
               </p>
-            ) : creditCard ? (
-              <p className="text-xs text-gray-500 mt-1">
-                Para cartões pré-pagos esta data representa o dia do pagamento.
-              </p>
-            ) : null}
+            )}
           </div>
 
           <div className="flex justify-end gap-3">

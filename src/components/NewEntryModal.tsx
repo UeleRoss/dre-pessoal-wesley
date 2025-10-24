@@ -64,7 +64,7 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
   }, [creditCards, formData.credit_card]);
 
   const invoiceInfo = useMemo(() => {
-    if (!selectedCreditCard || selectedCreditCard.card_type !== 'credit' || !formData.date) {
+    if (!selectedCreditCard || !formData.date) {
       return null;
     }
 
@@ -692,34 +692,21 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
               </p>
             )}
             {selectedCreditCard && (
-              <div
-                className={`rounded-md border p-3 text-sm ${
-                  selectedCreditCard.card_type === 'credit'
-                    ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : 'border-green-200 bg-green-50 text-green-700'
-                }`}
-              >
-                {selectedCreditCard.card_type === 'credit' ? (
-                  <div className="space-y-1">
-                    <p className="font-medium">Cartão de crédito</p>
-                    {formData.date && invoiceInfo ? (
-                      <p>
-                        Compra vai para a fatura de{" "}
-                        <span className="font-semibold">
-                          {invoiceInfo.invoiceMonth}
-                        </span>{" "}
-                        (vencimento em {invoiceInfo.dueDateFormatted}).
-                      </p>
-                    ) : (
-                      <p>Selecione a data da compra para ver a fatura e vencimento previstos.</p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="font-medium">Cartão pré-pago</p>
-                    <p>O valor será descontado imediatamente ao salvar este lançamento.</p>
-                  </div>
-                )}
+              <div className="rounded-md border p-3 text-sm border-blue-200 bg-blue-50 text-blue-700">
+                <div className="space-y-1">
+                  <p className="font-medium">Cartão de crédito</p>
+                  {formData.date && invoiceInfo ? (
+                    <p>
+                      Compra vai para a fatura de{" "}
+                      <span className="font-semibold">
+                        {invoiceInfo.invoiceMonth}
+                      </span>{" "}
+                      (vencimento em {invoiceInfo.dueDateFormatted}).
+                    </p>
+                  ) : (
+                    <p>Selecione a data da compra para ver a fatura e vencimento previstos.</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -733,16 +720,12 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
             required
           />
-          {selectedCreditCard?.card_type === 'credit' ? (
+          {selectedCreditCard && (
             <p className="text-xs text-blue-600 mt-1">
               Informe a data real da compra. Usamos essa informação para posicionar a
               despesa na fatura correta.
             </p>
-          ) : formData.credit_card ? (
-            <p className="text-xs text-gray-500 mt-1">
-              Para cartões pré-pagos usamos esta data como data do pagamento.
-            </p>
-          ) : null}
+          )}
         </div>
 
           <div className="flex gap-2 pt-4">

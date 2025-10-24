@@ -1,186 +1,222 @@
 -- =====================================================
--- MIGRATION ADAPTADA PARA SEU BANCO (SEM user_id)
--- =====================================================
--- Sistema single-user (sem autenticação multi-usuário)
--- =====================================================
-
--- =====================================================
--- PARTE 1: ADICIONAR COLUNAS NECESSÁRIAS
+-- LIMPEZA COMPLETA E DEFINITIVA
+-- Execute este SQL no Supabase Dashboard (SQL Editor)
 -- =====================================================
 
--- Adicionar coluna credit_card em financial_items
+-- 1. Remover TUDO relacionado a card_type e purchase_date
+DROP VIEW IF EXISTS public.credit_card_invoices CASCADE;
+DROP FUNCTION IF EXISTS public.get_invoice_reference_month(DATE, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS public.create_installment_purchase CASCADE;
+DROP FUNCTION IF EXISTS public.generate_pending_recurring_expenses CASCADE;
+
+-- 2. Remover colunas problemáticas
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='financial_items' AND column_name='credit_card') THEN
-    ALTER TABLE public.financial_items ADD COLUMN credit_card TEXT NULL;
-    RAISE NOTICE '✅ Coluna credit_card adicionada';
-  ELSE
-    RAISE NOTICE 'ℹ️  Coluna credit_card já existe';
+  -- Remover card_type da tabela credit_cards
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'credit_cards'
+      AND column_name = 'card_type'
+  ) THEN
+    ALTER TABLE public.credit_cards DROP COLUMN card_type;
+    RAISE NOTICE '✓ Coluna card_type removida';
+  END IF;
+
+  -- Remover purchase_date da tabela financial_items
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'financial_items'
+      AND column_name = 'purchase_date'
+  ) THEN
+    ALTER TABLE public.financial_items DROP COLUMN purchase_date;
+    RAISE NOTICE '✓ Coluna purchase_date removida';
   END IF;
 END $$;
 
--- Adicionar coluna installment_group_id se não existir
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='financial_items' AND column_name='installment_group_id') THEN
-    ALTER TABLE public.financial_items ADD COLUMN installment_group_id UUID NULL;
-    RAISE NOTICE '✅ Coluna installment_group_id adicionada';
-  ELSE
-    RAISE NOTICE 'ℹ️  Coluna installment_group_id já existe';
-  END IF;
-END $$;
-
--- Adicionar coluna recurring_template_id se não existir
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='financial_items' AND column_name='recurring_template_id') THEN
-    ALTER TABLE public.financial_items ADD COLUMN recurring_template_id UUID NULL;
-    RAISE NOTICE '✅ Coluna recurring_template_id adicionada';
-  ELSE
-    RAISE NOTICE 'ℹ️  Coluna recurring_template_id já existe';
-  END IF;
-END $$;
+-- 3. Remover índices antigos
+DROP INDEX IF EXISTS public.idx_credit_cards_card_type;
+DROP INDEX IF EXISTS public.idx_financial_items_purchase_date;
 
 -- =====================================================
--- PARTE 2: CRIAR TABELA CREDIT_CARDS (SEM user_id)
+-- RECRIAÇÃO LIMPA DAS FUNÇÕES E VIEWS
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS public.credit_cards (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  due_day INTEGER NOT NULL CHECK (due_day >= 1 AND due_day <= 31),
-  closing_day INTEGER NOT NULL CHECK (closing_day >= 1 AND closing_day <= 31),
-  credit_limit DECIMAL(10,2) NULL,
-  color TEXT DEFAULT '#3b82f6',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
--- Comentários
-COMMENT ON TABLE public.credit_cards IS 'Cadastro de cartões de crédito para gestão de faturas';
-
--- =====================================================
--- PARTE 3: CRIAR TABELA INVOICE_PAYMENTS (SEM user_id)
--- =====================================================
-
-CREATE TABLE IF NOT EXISTS public.invoice_payments (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  credit_card_id UUID NOT NULL REFERENCES public.credit_cards(id) ON DELETE CASCADE,
-  reference_month DATE NOT NULL,
-  invoice_amount DECIMAL(10,2) NOT NULL,
-  paid BOOLEAN DEFAULT false,
-  payment_date DATE NULL,
-  notes TEXT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  UNIQUE(credit_card_id, reference_month)
-);
-
--- =====================================================
--- PARTE 4: CRIAR ÍNDICES
--- =====================================================
-
-CREATE INDEX IF NOT EXISTS idx_financial_items_credit_card ON public.financial_items(credit_card);
-CREATE INDEX IF NOT EXISTS idx_financial_items_installment_group ON public.financial_items(installment_group_id) WHERE installment_group_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_credit_cards_active ON public.credit_cards(is_active) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_invoice_payments_month ON public.invoice_payments(reference_month);
-
--- =====================================================
--- PARTE 5: ATUALIZAR DADOS EXISTENTES
--- =====================================================
-
--- =====================================================
--- PARTE 6: VIEW DE FATURAS (SEM user_id)
--- =====================================================
-
-DROP VIEW IF EXISTS public.credit_card_invoices;
-
+-- View simples: agrupa lançamentos por cartão e mês
 CREATE OR REPLACE VIEW public.credit_card_invoices AS
 SELECT
-    cc.id AS credit_card_id,
-    cc.name AS card_name,
-    cc.due_day,
-    cc.closing_day,
-    cc.color,
-    DATE_TRUNC('month', fi.date)::DATE AS reference_month,
-    COUNT(fi.id) AS total_items,
-    COUNT(CASE WHEN fi.is_recurring THEN fi.id END) AS recurring_items,
-    COUNT(CASE WHEN fi.is_installment THEN fi.id END) AS installment_items,
-    COALESCE(SUM(fi.amount), 0) AS total_amount,
-    COALESCE(SUM(CASE WHEN fi.is_recurring THEN fi.amount ELSE 0 END), 0) AS recurring_amount,
-    COALESCE(SUM(CASE WHEN fi.is_installment THEN fi.amount ELSE 0 END), 0) AS installment_amount,
-    COALESCE(ip.paid, false) AS is_paid,
-    ip.payment_date,
-    ip.notes
+  cc.id AS credit_card_id,
+  cc.user_id,
+  cc.name AS card_name,
+  cc.due_day,
+  cc.closing_day,
+  cc.color,
+  DATE_TRUNC('month', fi.date)::DATE AS reference_month,
+  COUNT(fi.id) AS total_items,
+  COUNT(CASE WHEN fi.is_recurring THEN 1 END) AS recurring_items,
+  COUNT(CASE WHEN fi.is_installment THEN 1 END) AS installment_items,
+  COALESCE(SUM(fi.amount), 0) AS total_amount,
+  COALESCE(SUM(CASE WHEN fi.is_recurring THEN fi.amount ELSE 0 END), 0) AS recurring_amount,
+  COALESCE(SUM(CASE WHEN fi.is_installment THEN fi.amount ELSE 0 END), 0) AS installment_amount,
+  COALESCE(ip.paid, false) AS is_paid,
+  ip.payment_date,
+  ip.notes
 FROM public.credit_cards cc
-LEFT JOIN public.financial_items fi ON fi.credit_card = cc.name
-    AND fi.type IN ('saida', 'expense', 'despesa')
-LEFT JOIN public.invoice_payments ip ON ip.credit_card_id = cc.id
-    AND ip.reference_month = DATE_TRUNC('month', fi.date)::DATE
+LEFT JOIN public.financial_items fi
+  ON fi.credit_card = cc.name
+  AND fi.user_id = cc.user_id
+  AND fi.type = 'saida'
+LEFT JOIN public.invoice_payments ip
+  ON ip.credit_card_id = cc.id
+  AND ip.reference_month = DATE_TRUNC('month', fi.date)::DATE
 WHERE cc.is_active = true
 GROUP BY
-    cc.id, cc.name, cc.due_day, cc.closing_day, cc.color,
-    DATE_TRUNC('month', fi.date)::DATE, ip.paid, ip.payment_date, ip.notes
-ORDER BY reference_month DESC, card_name;
+  cc.id,
+  cc.user_id,
+  cc.name,
+  cc.due_day,
+  cc.closing_day,
+  cc.color,
+  DATE_TRUNC('month', fi.date)::DATE,
+  ip.paid,
+  ip.payment_date,
+  ip.notes
+ORDER BY reference_month DESC NULLS LAST, cc.name;
+
+GRANT SELECT ON public.credit_card_invoices TO authenticated;
+
+-- Função: criar parcelamento
+CREATE OR REPLACE FUNCTION public.create_installment_purchase(
+  p_user_id UUID,
+  p_type TEXT,
+  p_total_amount DECIMAL,
+  p_description TEXT,
+  p_category TEXT,
+  p_credit_card TEXT,
+  p_business_unit_id UUID,
+  p_start_date DATE,
+  p_total_installments INTEGER
+) RETURNS UUID AS $$
+DECLARE
+  v_group_id UUID;
+  v_installment_amount DECIMAL;
+  v_current_date DATE;
+BEGIN
+  v_group_id := gen_random_uuid();
+  v_installment_amount := ROUND(p_total_amount / p_total_installments, 2);
+
+  FOR i IN 1..p_total_installments LOOP
+    v_current_date := p_start_date + ((i - 1) * INTERVAL '1 month');
+
+    INSERT INTO public.financial_items (
+      user_id,
+      date,
+      type,
+      amount,
+      description,
+      category,
+      credit_card,
+      bank,
+      business_unit_id,
+      source,
+      is_installment,
+      installment_number,
+      total_installments,
+      installment_group_id
+    ) VALUES (
+      p_user_id,
+      v_current_date,
+      p_type,
+      v_installment_amount,
+      p_description || ' (' || i || '/' || p_total_installments || ')',
+      p_category,
+      p_credit_card,
+      COALESCE(p_credit_card, 'N/A'),
+      p_business_unit_id,
+      'installment',
+      true,
+      i,
+      p_total_installments,
+      v_group_id
+    );
+  END LOOP;
+
+  RETURN v_group_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Função: gerar recorrentes
+CREATE OR REPLACE FUNCTION public.generate_pending_recurring_expenses(
+  target_user_id UUID,
+  target_month DATE
+) RETURNS void AS $$
+BEGIN
+  INSERT INTO public.financial_items (
+    user_id,
+    date,
+    type,
+    amount,
+    description,
+    category,
+    business_unit_id,
+    credit_card,
+    bank,
+    source,
+    is_recurring,
+    recurring_template_id,
+    recurring_status
+  )
+  SELECT
+    rt.user_id,
+    target_month,
+    rt.type,
+    rt.amount,
+    rt.description,
+    rt.category,
+    rt.business_unit_id,
+    rt.credit_card,
+    COALESCE(rt.credit_card, 'N/A'),
+    'recurring_auto',
+    true,
+    rt.id,
+    'pending'
+  FROM public.recurring_templates rt
+  WHERE rt.user_id = target_user_id
+    AND rt.is_active = true
+    AND (rt.last_generated_month IS NULL OR rt.last_generated_month < target_month)
+    AND NOT EXISTS (
+      SELECT 1 FROM public.financial_items fi
+      WHERE fi.recurring_template_id = rt.id
+        AND DATE_TRUNC('month', fi.date) = DATE_TRUNC('month', target_month)
+    );
+
+  UPDATE public.recurring_templates
+  SET
+    last_generated_month = target_month,
+    updated_at = now()
+  WHERE user_id = target_user_id
+    AND is_active = true
+    AND (last_generated_month IS NULL OR last_generated_month < target_month);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =====================================================
--- VERIFICAÇÃO FINAL
+-- PRONTO! TUDO LIMPO E FUNCIONAL
 -- =====================================================
 
 DO $$
-DECLARE
-  table_exists BOOLEAN;
-  columns_ok BOOLEAN;
-  view_ok BOOLEAN;
 BEGIN
-  -- Verificar tabela credit_cards
-  SELECT EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'credit_cards'
-  ) INTO table_exists;
-
-  -- Verificar colunas
-  SELECT COUNT(*) = 2 INTO columns_ok
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-  AND (
-    (table_name = 'financial_items' AND column_name = 'credit_card')
-    OR (table_name = 'financial_items' AND column_name = 'installment_group_id')
-  );
-
-  -- Verificar view
-  SELECT EXISTS (
-    SELECT 1 FROM information_schema.views
-    WHERE table_schema = 'public' AND table_name = 'credit_card_invoices'
-  ) INTO view_ok;
-
-  IF table_exists AND columns_ok AND view_ok THEN
-    RAISE NOTICE '';
-    RAISE NOTICE '🎉 ========================================';
-    RAISE NOTICE '🎉 MIGRATION CONCLUÍDA COM SUCESSO!';
-    RAISE NOTICE '🎉 ========================================';
-    RAISE NOTICE '✅ Tabela criada: credit_cards';
-    RAISE NOTICE '✅ Tabela criada: invoice_payments';
-    RAISE NOTICE '✅ Coluna adicionada: financial_items.credit_card';
-    RAISE NOTICE '✅ Coluna adicionada: financial_items.installment_group_id';
-    RAISE NOTICE '✅ View criada: credit_card_invoices';
-    RAISE NOTICE '';
-    RAISE NOTICE '🚀 Próximos passos:';
-    RAISE NOTICE '1. Recarregue seu app (localhost:8080)';
-    RAISE NOTICE '2. Vá em Cartões de Crédito';
-    RAISE NOTICE '3. Cadastre seus cartões';
-    RAISE NOTICE '';
-  ELSE
-    RAISE WARNING '⚠️  Alguns componentes podem estar faltando:';
-    IF NOT table_exists THEN
-      RAISE WARNING '❌ Tabela credit_cards não foi criada';
-    END IF;
-    IF NOT columns_ok THEN
-      RAISE WARNING '❌ Nem todas as colunas foram adicionadas';
-    END IF;
-    IF NOT view_ok THEN
-      RAISE WARNING '❌ View não foi criada';
-    END IF;
-  END IF;
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✓ LIMPEZA CONCLUÍDA COM SUCESSO!';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✓ Removido: card_type';
+  RAISE NOTICE '✓ Removido: purchase_date';
+  RAISE NOTICE '✓ View recriada: credit_card_invoices';
+  RAISE NOTICE '✓ Funções recriadas';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Agora você pode usar o app normalmente!';
+  RAISE NOTICE 'Todos os cartões são de CRÉDITO por padrão.';
+  RAISE NOTICE '';
 END $$;

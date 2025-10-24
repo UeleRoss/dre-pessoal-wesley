@@ -32,18 +32,6 @@ const InvoiceCard = ({ invoice, onViewDetails, onMarkAsPaid }: InvoiceCardProps)
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <CardTitle className="text-lg">{invoice.card_name}</CardTitle>
-                {invoice.card_type === 'prepaid' && (
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
-                    <Wallet className="h-3 w-3 mr-1" />
-                    Pré-pago
-                  </Badge>
-                )}
-                {invoice.card_type === 'credit' && (
-                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300">
-                    <BadgeDollarSign className="h-3 w-3 mr-1" />
-                    Crédito
-                  </Badge>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-3 w-3 text-gray-500" />

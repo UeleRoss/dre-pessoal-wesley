@@ -142,7 +142,6 @@ export type Database = {
       }
       credit_cards: {
         Row: {
-          card_type: string
           closing_day: number
           color: string
           created_at: string
@@ -155,7 +154,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          card_type?: string
           closing_day: number
           color?: string
           created_at?: string
@@ -168,7 +166,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          card_type?: string
           closing_day?: number
           color?: string
           created_at?: string
