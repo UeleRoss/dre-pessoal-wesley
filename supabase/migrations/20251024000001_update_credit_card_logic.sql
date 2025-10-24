@@ -1,37 +1,102 @@
 -- =====================================================
--- Migration: Ajustes na lógica de cartões com card_type/purchase_date
+-- Migration: Simplificação TOTAL da lógica de cartões
 -- Data: 2025-10-24
--- Descrição: adiciona helper para mês de referência e atualiza funções
+-- Descrição: Remove toda complexidade, mantém apenas o básico
 -- =====================================================
 
--- Helper function para calcular o mês da fatura com base na data de compra
-CREATE OR REPLACE FUNCTION public.get_invoice_reference_month(
-  p_purchase_date DATE,
-  p_closing_day INTEGER
-) RETURNS DATE AS $$
-DECLARE
-  v_reference DATE;
+-- Limpar tudo que existe
+DROP VIEW IF EXISTS public.credit_card_invoices CASCADE;
+DROP FUNCTION IF EXISTS public.get_invoice_reference_month(DATE, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS public.create_installment_purchase CASCADE;
+DROP FUNCTION IF EXISTS public.generate_pending_recurring_expenses CASCADE;
+
+-- Remover colunas problemáticas se existirem
+DO $$
 BEGIN
-  IF p_purchase_date IS NULL THEN
-    RETURN NULL;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'credit_cards' AND column_name = 'card_type'
+  ) THEN
+    ALTER TABLE public.credit_cards DROP COLUMN card_type;
   END IF;
 
-  v_reference := DATE_TRUNC('month', p_purchase_date)::DATE;
-
-  IF p_closing_day IS NULL OR p_closing_day < 1 OR p_closing_day > 31 THEN
-    p_closing_day := 31;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'financial_items' AND column_name = 'purchase_date'
+  ) THEN
+    ALTER TABLE public.financial_items DROP COLUMN purchase_date;
   END IF;
+END $$;
 
-  IF EXTRACT(DAY FROM p_purchase_date) > p_closing_day THEN
-    v_reference := (v_reference + INTERVAL '1 month')::DATE;
-  END IF;
-
-  RETURN v_reference;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+-- Remover índices antigos
+DROP INDEX IF EXISTS public.idx_credit_cards_card_type;
+DROP INDEX IF EXISTS public.idx_financial_items_purchase_date;
 
 -- =====================================================
--- Atualiza função de compras parceladas para respeitar card_type
+-- Tabela credit_cards: apenas o essencial
+-- =====================================================
+-- Campos:
+-- - id, user_id, name (nome do cartão)
+-- - due_day (dia vencimento)
+-- - closing_day (dia fechamento)
+-- - credit_limit (opcional)
+-- - color (para UI)
+-- - is_active, created_at, updated_at
+-- =====================================================
+
+-- A tabela já existe, só garantir os campos corretos
+-- (sem card_type, sem purchase_date)
+
+-- =====================================================
+-- View SIMPLES: credit_card_invoices
+-- Agrupa lançamentos por cartão e mês
+-- =====================================================
+
+CREATE OR REPLACE VIEW public.credit_card_invoices AS
+SELECT
+  cc.id AS credit_card_id,
+  cc.user_id,
+  cc.name AS card_name,
+  cc.due_day,
+  cc.closing_day,
+  cc.color,
+  DATE_TRUNC('month', fi.date)::DATE AS reference_month,
+  COUNT(fi.id) AS total_items,
+  COUNT(CASE WHEN fi.is_recurring THEN 1 END) AS recurring_items,
+  COUNT(CASE WHEN fi.is_installment THEN 1 END) AS installment_items,
+  COALESCE(SUM(fi.amount), 0) AS total_amount,
+  COALESCE(SUM(CASE WHEN fi.is_recurring THEN fi.amount ELSE 0 END), 0) AS recurring_amount,
+  COALESCE(SUM(CASE WHEN fi.is_installment THEN fi.amount ELSE 0 END), 0) AS installment_amount,
+  COALESCE(ip.paid, false) AS is_paid,
+  ip.payment_date,
+  ip.notes
+FROM public.credit_cards cc
+LEFT JOIN public.financial_items fi
+  ON fi.credit_card = cc.name
+  AND fi.user_id = cc.user_id
+  AND fi.type = 'saida'
+LEFT JOIN public.invoice_payments ip
+  ON ip.credit_card_id = cc.id
+  AND ip.reference_month = DATE_TRUNC('month', fi.date)::DATE
+WHERE cc.is_active = true
+GROUP BY
+  cc.id,
+  cc.user_id,
+  cc.name,
+  cc.due_day,
+  cc.closing_day,
+  cc.color,
+  DATE_TRUNC('month', fi.date)::DATE,
+  ip.paid,
+  ip.payment_date,
+  ip.notes
+ORDER BY reference_month DESC NULLS LAST, cc.name;
+
+GRANT SELECT ON public.credit_card_invoices TO authenticated;
+
+-- =====================================================
+-- Função SIMPLES: criar parcelamento
+-- Não precisa de card_type, apenas cria N lançamentos
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.create_installment_purchase(
@@ -48,46 +113,17 @@ CREATE OR REPLACE FUNCTION public.create_installment_purchase(
 DECLARE
   v_group_id UUID;
   v_installment_amount DECIMAL;
-  v_card_type TEXT := 'prepaid';
-  v_closing_day INTEGER := 31;
-  v_first_reference DATE;
-  v_reference DATE;
-  v_installment_purchase_date DATE;
-  v_i INTEGER;
+  v_current_date DATE;
 BEGIN
   v_group_id := gen_random_uuid();
   v_installment_amount := ROUND(p_total_amount / p_total_installments, 2);
 
-  IF p_credit_card IS NOT NULL THEN
-    SELECT
-      COALESCE(card_type, v_card_type),
-      COALESCE(closing_day, v_closing_day)
-    INTO v_card_type, v_closing_day
-    FROM public.credit_cards
-    WHERE user_id = p_user_id
-      AND name = p_credit_card
-    LIMIT 1;
-  END IF;
-
-  IF v_card_type = 'credit' THEN
-    v_first_reference := public.get_invoice_reference_month(p_start_date, v_closing_day);
-  ELSE
-    v_first_reference := p_start_date;
-  END IF;
-
-  FOR v_i IN 1..p_total_installments LOOP
-    IF v_card_type = 'credit' THEN
-      v_reference := (v_first_reference + (v_i - 1) * INTERVAL '1 month')::DATE;
-      v_installment_purchase_date := p_start_date;
-    ELSE
-      v_reference := (p_start_date + (v_i - 1) * INTERVAL '1 month')::DATE;
-      v_installment_purchase_date := v_reference;
-    END IF;
+  FOR i IN 1..p_total_installments LOOP
+    v_current_date := p_start_date + ((i - 1) * INTERVAL '1 month');
 
     INSERT INTO public.financial_items (
       user_id,
       date,
-      purchase_date,
       type,
       amount,
       description,
@@ -102,18 +138,17 @@ BEGIN
       installment_group_id
     ) VALUES (
       p_user_id,
-      v_reference,
-      v_installment_purchase_date,
+      v_current_date,
       p_type,
       v_installment_amount,
-      p_description || ' (' || v_i || '/' || p_total_installments || ')',
+      p_description || ' (' || i || '/' || p_total_installments || ')',
       p_category,
       p_credit_card,
       COALESCE(p_credit_card, 'N/A'),
       p_business_unit_id,
       'installment',
       true,
-      v_i,
+      i,
       p_total_installments,
       v_group_id
     );
@@ -121,13 +156,11 @@ BEGIN
 
   RETURN v_group_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
-COMMENT ON FUNCTION public.get_invoice_reference_month IS
-'Calcula o mês de referência da fatura (primeiro dia do mês) considerando o dia de fechamento';
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =====================================================
--- Atualiza função de recorrentes para preencher purchase_date
+-- Função SIMPLES: gerar recorrentes
+-- Só cria lançamentos pendentes para aprovação
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.generate_pending_recurring_expenses(
@@ -138,7 +171,6 @@ BEGIN
   INSERT INTO public.financial_items (
     user_id,
     date,
-    purchase_date,
     type,
     amount,
     description,
@@ -153,7 +185,6 @@ BEGIN
   )
   SELECT
     rt.user_id,
-    target_month,
     target_month,
     rt.type,
     rt.amount,
@@ -177,10 +208,11 @@ BEGIN
     );
 
   UPDATE public.recurring_templates
-  SET last_generated_month = target_month,
-      updated_at = now()
+  SET
+    last_generated_month = target_month,
+    updated_at = now()
   WHERE user_id = target_user_id
     AND is_active = true
     AND (last_generated_month IS NULL OR last_generated_month < target_month);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

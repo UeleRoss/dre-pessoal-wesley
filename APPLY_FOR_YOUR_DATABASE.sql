@@ -19,17 +19,6 @@ BEGIN
   END IF;
 END $$;
 
--- Adicionar coluna purchase_date em financial_items
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='financial_items' AND column_name='purchase_date') THEN
-    ALTER TABLE public.financial_items ADD COLUMN purchase_date DATE;
-    RAISE NOTICE '✅ Coluna purchase_date adicionada';
-  ELSE
-    RAISE NOTICE 'ℹ️  Coluna purchase_date já existe';
-  END IF;
-END $$;
-
 -- Adicionar coluna installment_group_id se não existir
 DO $$
 BEGIN
@@ -63,7 +52,6 @@ CREATE TABLE IF NOT EXISTS public.credit_cards (
   closing_day INTEGER NOT NULL CHECK (closing_day >= 1 AND closing_day <= 31),
   credit_limit DECIMAL(10,2) NULL,
   color TEXT DEFAULT '#3b82f6',
-  card_type TEXT NOT NULL DEFAULT 'credit' CHECK (card_type IN ('prepaid', 'credit')),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
@@ -71,8 +59,6 @@ CREATE TABLE IF NOT EXISTS public.credit_cards (
 
 -- Comentários
 COMMENT ON TABLE public.credit_cards IS 'Cadastro de cartões de crédito para gestão de faturas';
-COMMENT ON COLUMN public.credit_cards.card_type IS 'Type of card: "prepaid" (affects balance immediately) or "credit" (affects balance when invoice is paid)';
-COMMENT ON COLUMN public.financial_items.purchase_date IS 'Actual date of purchase (for credit cards)';
 
 -- =====================================================
 -- PARTE 3: CRIAR TABELA INVOICE_PAYMENTS (SEM user_id)
@@ -96,7 +82,6 @@ CREATE TABLE IF NOT EXISTS public.invoice_payments (
 -- =====================================================
 
 CREATE INDEX IF NOT EXISTS idx_financial_items_credit_card ON public.financial_items(credit_card);
-CREATE INDEX IF NOT EXISTS idx_financial_items_purchase_date ON public.financial_items(purchase_date) WHERE purchase_date IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_financial_items_installment_group ON public.financial_items(installment_group_id) WHERE installment_group_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_credit_cards_active ON public.credit_cards(is_active) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_invoice_payments_month ON public.invoice_payments(reference_month);
@@ -104,11 +89,6 @@ CREATE INDEX IF NOT EXISTS idx_invoice_payments_month ON public.invoice_payments
 -- =====================================================
 -- PARTE 5: ATUALIZAR DADOS EXISTENTES
 -- =====================================================
-
--- Atualizar purchase_date para transações existentes com cartão
-UPDATE public.financial_items
-SET purchase_date = date::DATE
-WHERE credit_card IS NOT NULL AND purchase_date IS NULL;
 
 -- =====================================================
 -- PARTE 6: VIEW DE FATURAS (SEM user_id)
@@ -123,7 +103,6 @@ SELECT
     cc.due_day,
     cc.closing_day,
     cc.color,
-    cc.card_type,
     DATE_TRUNC('month', fi.date)::DATE AS reference_month,
     COUNT(fi.id) AS total_items,
     COUNT(CASE WHEN fi.is_recurring THEN fi.id END) AS recurring_items,
@@ -135,13 +114,13 @@ SELECT
     ip.payment_date,
     ip.notes
 FROM public.credit_cards cc
-INNER JOIN public.financial_items fi ON fi.credit_card = cc.name
+LEFT JOIN public.financial_items fi ON fi.credit_card = cc.name
     AND fi.type IN ('saida', 'expense', 'despesa')
 LEFT JOIN public.invoice_payments ip ON ip.credit_card_id = cc.id
     AND ip.reference_month = DATE_TRUNC('month', fi.date)::DATE
 WHERE cc.is_active = true
 GROUP BY
-    cc.id, cc.name, cc.due_day, cc.closing_day, cc.color, cc.card_type,
+    cc.id, cc.name, cc.due_day, cc.closing_day, cc.color,
     DATE_TRUNC('month', fi.date)::DATE, ip.paid, ip.payment_date, ip.notes
 ORDER BY reference_month DESC, card_name;
 
@@ -162,13 +141,12 @@ BEGIN
   ) INTO table_exists;
 
   -- Verificar colunas
-  SELECT COUNT(*) = 3 INTO columns_ok
+  SELECT COUNT(*) = 2 INTO columns_ok
   FROM information_schema.columns
   WHERE table_schema = 'public'
   AND (
-    (table_name = 'credit_cards' AND column_name = 'card_type')
-    OR (table_name = 'financial_items' AND column_name = 'purchase_date')
-    OR (table_name = 'financial_items' AND column_name = 'credit_card')
+    (table_name = 'financial_items' AND column_name = 'credit_card')
+    OR (table_name = 'financial_items' AND column_name = 'installment_group_id')
   );
 
   -- Verificar view
@@ -185,7 +163,6 @@ BEGIN
     RAISE NOTICE '✅ Tabela criada: credit_cards';
     RAISE NOTICE '✅ Tabela criada: invoice_payments';
     RAISE NOTICE '✅ Coluna adicionada: financial_items.credit_card';
-    RAISE NOTICE '✅ Coluna adicionada: financial_items.purchase_date';
     RAISE NOTICE '✅ Coluna adicionada: financial_items.installment_group_id';
     RAISE NOTICE '✅ View criada: credit_card_invoices';
     RAISE NOTICE '';

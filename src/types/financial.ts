@@ -21,7 +21,6 @@ export interface FinancialItem {
 
   // Cartão de Crédito
   credit_card?: string | null;
-  purchase_date?: string | null; // Data real da compra (para cartões de crédito)
 
   // Parcelamento
   is_installment?: boolean;
@@ -75,7 +74,6 @@ export interface CreditCard {
   closing_day: number;
   credit_limit: number | null;
   color: string;
-  card_type: 'prepaid' | 'credit'; // prepaid: desconta na hora, credit: desconta ao pagar fatura
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -101,7 +99,6 @@ export interface CreditCardInvoice {
   due_day: number;
   closing_day: number;
   color: string;
-  card_type: 'prepaid' | 'credit';
   reference_month: string;
   total_items: number;
   recurring_items: number;

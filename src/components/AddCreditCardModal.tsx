@@ -10,8 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CreditCard, Wallet, BadgeDollarSign } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { useCreditCards } from "@/hooks/useCreditCards";
 import { useToast } from "@/hooks/use-toast";
 import type { CreditCard as CreditCardType } from "@/types/financial";
@@ -42,7 +41,6 @@ const defaultFormState = {
   closing_day: '5',
   credit_limit: '',
   color: '#3b82f6',
-  card_type: 'credit' as 'prepaid' | 'credit',
 };
 
 const AddCreditCardModal = ({
@@ -71,7 +69,6 @@ const AddCreditCardModal = ({
         closing_day: String(card.closing_day ?? defaultFormState.closing_day),
         credit_limit: card.credit_limit != null ? String(card.credit_limit) : '',
         color: card.color || defaultFormState.color,
-        card_type: card.card_type || defaultFormState.card_type,
       });
     } else {
       setFormData({ ...defaultFormState });
@@ -124,7 +121,6 @@ const AddCreditCardModal = ({
             closing_day: closingDay,
             credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : null,
             color: formData.color,
-            card_type: formData.card_type,
           }
         });
       } else {
@@ -134,7 +130,6 @@ const AddCreditCardModal = ({
           closing_day: closingDay,
           credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : null,
           color: formData.color,
-          card_type: formData.card_type,
         });
       }
 
@@ -199,54 +194,6 @@ const AddCreditCardModal = ({
               disabled={isSaving || isDeleting}
               required
             />
-          </div>
-
-          <div>
-            <Label>Tipo de Cartão *</Label>
-            <RadioGroup
-              value={formData.card_type}
-              onValueChange={(value: 'prepaid' | 'credit') => setFormData({ ...formData, card_type: value })}
-              className="grid grid-cols-2 gap-4 mt-2"
-              disabled={isSaving || isDeleting}
-            >
-              <div className="relative">
-                <RadioGroupItem
-                  value="credit"
-                  id="card-type-credit"
-                  className="peer sr-only"
-                  disabled={isSaving || isDeleting}
-                />
-                <Label
-                  htmlFor="card-type-credit"
-                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-gray-200 bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 cursor-pointer transition-all"
-                >
-                  <BadgeDollarSign className="h-6 w-6 text-gray-700 peer-data-[state=checked]:text-blue-700" />
-                  <div className="text-center">
-                    <div className="font-semibold text-sm">Crédito</div>
-                    <div className="text-xs text-gray-600 mt-1">Paga na fatura seguinte</div>
-                  </div>
-                </Label>
-              </div>
-
-              <div className="relative">
-                <RadioGroupItem
-                  value="prepaid"
-                  id="card-type-prepaid"
-                  className="peer sr-only"
-                  disabled={isSaving || isDeleting}
-                />
-                <Label
-                  htmlFor="card-type-prepaid"
-                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-gray-200 bg-white p-4 hover:bg-gray-50 peer-data-[state=checked]:border-green-600 peer-data-[state=checked]:bg-green-50 cursor-pointer transition-all"
-                >
-                  <Wallet className="h-6 w-6 text-gray-700 peer-data-[state=checked]:text-green-700" />
-                  <div className="text-center">
-                    <div className="font-semibold text-sm">Pré-pago</div>
-                    <div className="text-xs text-gray-600 mt-1">Desconta na hora</div>
-                  </div>
-                </Label>
-              </div>
-            </RadioGroup>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
