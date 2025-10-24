@@ -304,7 +304,6 @@ export type Database = {
           installment_number: number | null
           is_installment: boolean
           is_recurring: boolean
-          purchase_date: string | null
           recurring_status: string | null
           recurring_template_id: string | null
           source: string | null
@@ -327,7 +326,6 @@ export type Database = {
           installment_number?: number | null
           is_installment?: boolean
           is_recurring?: boolean
-          purchase_date?: string | null
           recurring_status?: string | null
           recurring_template_id?: string | null
           source?: string | null
@@ -350,7 +348,6 @@ export type Database = {
           installment_number?: number | null
           is_installment?: boolean
           is_recurring?: boolean
-          purchase_date?: string | null
           recurring_status?: string | null
           recurring_template_id?: string | null
           source?: string | null

@@ -237,16 +237,6 @@ const InvoiceDetailModal = ({
             ) : (
               <div className="space-y-2">
                 {invoiceItems.map((item) => {
-                  const purchaseDateLabel = item.purchase_date
-                    ? formatBrazilDate(item.purchase_date)
-                    : null;
-                  const invoiceMonthLabel = item.purchase_date
-                    ? formatInvoiceMonth(item.date)
-                    : null;
-                  const isCreditPurchase = item.purchase_date
-                    ? new Date(item.purchase_date).getTime() !== new Date(item.date).getTime()
-                    : false;
-
                   return (
                     <div
                       key={item.id}
@@ -269,19 +259,8 @@ const InvoiceDetailModal = ({
                           )}
                         </div>
                         <div className="text-sm text-gray-600 flex flex-wrap items-center gap-1">
-                          {purchaseDateLabel && invoiceMonthLabel && isCreditPurchase ? (
-                            <>
-                              <span>Compra: {purchaseDateLabel}</span>
-                              <span className="text-gray-300">•</span>
-                              <span>Fatura: {invoiceMonthLabel}</span>
-                              <span className="text-gray-300">•</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>{formatBrazilDate(item.date)}</span>
-                              <span className="text-gray-300">•</span>
-                            </>
-                          )}
+                          <span>{formatBrazilDate(item.date)}</span>
+                          <span className="text-gray-300">•</span>
                           <span>{item.category}</span>
                         </div>
                       </div>

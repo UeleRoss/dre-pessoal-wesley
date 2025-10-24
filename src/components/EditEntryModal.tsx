@@ -34,7 +34,6 @@ interface FinancialItem {
   total_installments?: number | null;
   installment_group_id?: string | null;
   installment_number?: number | null;
-  purchase_date?: string | null;
 }
 
 interface EditEntryModalProps {
@@ -133,7 +132,7 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       setType(item.type);
       setCategory(item.category);
       setBusinessUnitId(item.business_unit_id || null);
-      setDate(item.purchase_date || item.date);
+      setDate(item.date);
       setCreditCard(item.credit_card || "");
       const isExpense = item.type === 'saida';
       setIsRecurring(isExpense ? !!item.is_recurring : false);
@@ -323,7 +322,6 @@ const EditEntryModal = ({ isOpen, onClose, onSuccess, item, userId }: EditEntryM
       category,
       business_unit_id: businessUnitId,
       date: transactionDate,
-      purchase_date: purchaseDateValue,
       needs_review: false,
       updated_at: new Date().toISOString(),
       credit_card: allowAdvancedOptions && creditCard ? creditCard : null,

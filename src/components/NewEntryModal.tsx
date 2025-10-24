@@ -278,11 +278,9 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
     setIsSubmitting(true);
     try {
       const purchaseDate = formData.date;
-      const isCreditCard = selectedCreditCard?.card_type === 'credit';
-      const transactionDate = isCreditCard && invoiceInfo?.referenceMonth
+      const transactionDate = selectedCreditCard && invoiceInfo?.referenceMonth
         ? invoiceInfo.referenceMonth
         : purchaseDate;
-      const purchaseDateValue = isCreditCard ? purchaseDate : null;
 
       if (formData.is_installment) {
         // === COMPRA PARCELADA ===
@@ -333,7 +331,6 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           category: formData.category,
           bank: formData.credit_card || 'N/A',
           date: transactionDate,
-          purchase_date: purchaseDateValue,
           business_unit_id: formData.business_unit_id,
           user_id: user.id,
           is_recurring: true,
@@ -358,7 +355,6 @@ const NewEntryModal = ({ isOpen, onClose, onSuccess }: NewEntryModalProps) => {
           category: formData.category,
           bank: formData.credit_card || 'N/A',
           date: transactionDate,
-          purchase_date: purchaseDateValue,
           business_unit_id: formData.business_unit_id,
           credit_card: formData.credit_card || null,
           user_id: user.id,
