@@ -12,6 +12,7 @@ export const DEFAULT_CATEGORIES = [
   "Lazer e ócio",
   "Pro-Labore",
   "Vida esportiva",
+  "Filhos",
   "Anúncios Online",
   "Tráfego Pago",
   "Itens Físicos",

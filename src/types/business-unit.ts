@@ -16,6 +16,7 @@ export const DEFAULT_BUSINESS_UNITS = [
   { name: 'Go On Outdoor', color: '#14b8a6', icon: 'mountain' },
   { name: 'Carro', color: '#6366f1', icon: 'car' },
   { name: 'Comida', color: '#ec4899', icon: 'utensils' },
+  { name: 'Filhos', color: '#facc15', icon: 'baby' },
 ] as const;
 
 // Mapeamento de categorias para unidades de negócio (sugestões automáticas)
@@ -54,4 +55,12 @@ export const CATEGORY_TO_BUSINESS_UNIT_MAP: Record<string, string> = {
   // Compras Pessoais (default para outros)
   'Itens Físicos': 'Compras Pessoais',
   'Estudos': 'Compras Pessoais',
+
+  // Filhos
+  'Filhos': 'Filhos',
+  'Material Escolar': 'Filhos',
+  'Mensalidade Escolar': 'Filhos',
+  'Atividades da Criança': 'Filhos',
+  'Saúde Infantil': 'Filhos',
+  'Brinquedos': 'Filhos',
 };

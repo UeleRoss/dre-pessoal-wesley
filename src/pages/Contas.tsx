@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { DEFAULT_CATEGORIES } from "@/constants/categories";
 
 type SupabaseUser = {
   id: string;
@@ -49,14 +50,47 @@ const emptyForm: BillFormValues = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+const toTitleCase = (value: string) =>
+  value
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) => {
+      if (!word) return "";
+      if (word.length === 1) return word.toUpperCase();
+      const lower = word.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+
+const formatBankName = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const normalized = trimmed.replace(/\s+/g, " ");
+  const tokens = normalized.split(" ");
+  const formattedTokens = tokens.map((token) => {
+    if (!token) return "";
+    const hasSpecial = /[^0-9A-Za-zÀ-ÖØ-öø-ÿ]/u.test(token);
+    if (hasSpecial) {
+      return token.toUpperCase();
+    }
+    if (token.length <= 2) {
+      return token.toUpperCase();
+    }
+    const lower = token.toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  });
+  return formattedTokens.join(" ");
+};
+
 const buildCsv = (rows: Array<{ bill: RecurringBill; amount: number; isPaid: boolean; month: string }>) => {
   const header = ["month", "name", "value", "category", "bank", "status"];
   const payload = rows.map(({ bill, amount, isPaid, month }) => [
     month,
     `"${bill.name.replace(/"/g, '""')}"`,
     amount.toFixed(2),
-    `"${(bill.category || "").replace(/"/g, '""')}"`,
-    `"${(bill.bank || "").replace(/"/g, '""')}"`,
+    `"${(bill.category?.trim() || "").replace(/"/g, '""')}"`,
+    `"${formatBankName(bill.bank ?? "").replace(/"/g, '""')}"`,
     isPaid ? "pago" : "pendente",
   ]);
 
@@ -78,6 +112,8 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBill, setEditingBill] = useState<RecurringBill | null>(null);
   const [formValues, setFormValues] = useState<BillFormValues>(emptyForm);
+  const [categoryMode, setCategoryMode] = useState<"list" | "custom">("list");
+  const [bankMode, setBankMode] = useState<"list" | "custom">("list");
 
   const { data: bills = [], isLoading: isLoadingBills } = useQuery<RecurringBill[]>({
     queryKey: ["recurring-bills", user.id],
@@ -129,6 +165,40 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
     });
   }, [bills, billInstances]);
 
+  const categoryOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    const addOption = (value: string | null | undefined) => {
+      const trimmed = value?.trim();
+      if (!trimmed) return;
+      const key = trimmed.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, trimmed);
+      }
+    };
+
+    bills.forEach((bill) => addOption(bill.category));
+    DEFAULT_CATEGORIES.forEach((category) => addOption(category));
+
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [bills]);
+
+  const bankOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    const addBank = (value: string | null | undefined) => {
+      if (!value) return;
+      const formatted = formatBankName(value);
+      if (!formatted) return;
+      const key = formatted.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, formatted);
+      }
+    };
+
+    bills.forEach((bill) => addBank(bill.bank));
+
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [bills]);
+
   const totals = useMemo(() => {
     const total = displayBills.reduce((acc, item) => acc + item.amount, 0);
     const paid = displayBills.filter((item) => item.isPaid).reduce((acc, item) => acc + item.amount, 0);
@@ -139,9 +209,26 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
     };
   }, [displayBills]);
 
+  useEffect(() => {
+    if (categoryMode !== "list") return;
+    if (categoryOptions.length === 0) return;
+    if (categoryOptions.includes(formValues.category)) return;
+    setFormValues((prev) => ({ ...prev, category: categoryOptions[0] }));
+  }, [categoryMode, categoryOptions, formValues.category]);
+
+  useEffect(() => {
+    if (bankMode !== "list") return;
+    if (bankOptions.length === 0) return;
+    const formatted = formatBankName(formValues.bank);
+    if (formatted && bankOptions.includes(formatted)) return;
+    setFormValues((prev) => ({ ...prev, bank: bankOptions[0] ?? "" }));
+  }, [bankMode, bankOptions, formValues.bank]);
+
   const resetForm = () => {
     setFormValues(emptyForm);
     setEditingBill(null);
+    setCategoryMode("list");
+    setBankMode("list");
   };
 
   const invalidateQueries = () => {
@@ -152,13 +239,15 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
   const createBillMutation = useMutation({
     mutationFn: async (payload: BillFormValues) => {
       const value = Math.abs(Number(payload.value));
+      const sanitizedCategory = payload.category.trim();
+      const sanitizedBank = formatBankName(payload.bank);
       const { error } = await supabase.from("recurring_bills").insert({
         user_id: user.id,
         name: payload.name.trim(),
         value,
         due_date: Number(payload.due_date),
-        category: payload.category.trim() || null,
-        bank: payload.bank.trim() || null,
+        category: sanitizedCategory || null,
+        bank: sanitizedBank || null,
       });
 
       if (error) throw error;
@@ -181,14 +270,16 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
   const updateBillMutation = useMutation({
     mutationFn: async (payload: BillFormValues & { id: string }) => {
       const value = Math.abs(Number(payload.value));
+      const sanitizedCategory = payload.category.trim();
+      const sanitizedBank = formatBankName(payload.bank);
       const { error } = await supabase
         .from("recurring_bills")
         .update({
           name: payload.name.trim(),
           value,
           due_date: Number(payload.due_date),
-          category: payload.category.trim() || null,
-          bank: payload.bank.trim() || null,
+          category: sanitizedCategory || null,
+          bank: sanitizedBank || null,
         })
         .eq("id", payload.id)
         .eq("user_id", user.id);
@@ -433,8 +524,10 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
                         Dia {Number(bill.due_date).toString().padStart(2, "0")}
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-700">{bill.name}</td>
-                      <td className="px-4 py-3 text-slate-500">{bill.category || "-"}</td>
-                      <td className="px-4 py-3 text-slate-500">{bill.bank || "-"}</td>
+                      <td className="px-4 py-3 text-slate-500">{bill.category?.trim() || "-"}</td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {bill.bank ? formatBankName(bill.bank) : "-"}
+                      </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-700">{formatCurrency(amount)}</td>
                       <td className="px-4 py-3 text-right">
                         <span
@@ -470,12 +563,24 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
                             variant="outline"
                             onClick={() => {
                               setEditingBill(bill);
+                              const trimmedCategory = bill.category?.trim() || "";
+                              const formattedBank = formatBankName(bill.bank ?? "");
+                              setCategoryMode(
+                                trimmedCategory && categoryOptions.includes(trimmedCategory)
+                                  ? "list"
+                                  : "custom"
+                              );
+                              setBankMode(
+                                formattedBank && bankOptions.includes(formattedBank)
+                                  ? "list"
+                                  : "custom"
+                              );
                               setFormValues({
                                 name: bill.name,
                                 value: String(bill.value),
                                 due_date: String(bill.due_date),
-                                category: bill.category ?? "",
-                                bank: bill.bank ?? "",
+                                category: trimmedCategory,
+                                bank: formattedBank,
                               });
                               setIsFormOpen(true);
                             }}
@@ -552,23 +657,77 @@ const Contas = ({ user }: { user: SupabaseUser }) => {
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-medium text-slate-600">Categoria</label>
-              <input
-                type="text"
-                value={formValues.category}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, category: event.target.value }))}
+              <select
+                value={
+                  categoryMode === "list"
+                    ? categoryOptions.includes(formValues.category)
+                      ? formValues.category
+                      : ""
+                    : "__custom"
+                }
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "__custom") {
+                    setCategoryMode("custom");
+                    setFormValues((prev) => ({ ...prev, category: "" }));
+                    return;
+                  }
+                  setCategoryMode("list");
+                  setFormValues((prev) => ({ ...prev, category: value }));
+                }}
                 className="rounded border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Opcional"
-              />
+              >
+                <option value="">Selecione</option>
+                {categoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+                <option value="__custom">Outra...</option>
+              </select>
+              {categoryMode === "custom" && (
+                <input
+                  type="text"
+                  value={formValues.category}
+                  onChange={(event) => setFormValues((prev) => ({ ...prev, category: event.target.value }))}
+                  className="rounded border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Informe a categoria"
+                />
+              )}
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-medium text-slate-600">Banco/Conta</label>
-              <input
-                type="text"
-                value={formValues.bank}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, bank: event.target.value }))}
+              <select
+                value={bankMode === "list" ? formValues.bank : "__custom"}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "__custom") {
+                    setBankMode("custom");
+                    setFormValues((prev) => ({ ...prev, bank: "" }));
+                    return;
+                  }
+                  setBankMode("list");
+                  setFormValues((prev) => ({ ...prev, bank: value }));
+                }}
                 className="rounded border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Opcional"
-              />
+              >
+                <option value="">Selecione</option>
+                {bankOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+                <option value="__custom">Outro...</option>
+              </select>
+              {bankMode === "custom" && (
+                <input
+                  type="text"
+                  value={formValues.bank}
+                  onChange={(event) => setFormValues((prev) => ({ ...prev, bank: event.target.value }))}
+                  className="rounded border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Informe o banco"
+                />
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button
