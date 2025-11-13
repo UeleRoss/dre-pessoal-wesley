@@ -1,0 +1,3 @@
+id,user_id,name,due_day,closing_day,credit_limit,color,is_active,created_at,updated_at
+df6e3de1-c1f3-4c44-93be-31e38db2dd80,a3b12ed2-9440-40d9-9293-3c20e778dd74,C6 Bank,15,7,21000.00,#3b82f6,t,2025-10-14 01:46:05.977722+00,2025-10-15 15:06:49.633576+00
+10afe38b-ee7b-402d-8fbd-ac1d2c9d0b68,a3b12ed2-9440-40d9-9293-3c20e778dd74,Conta Simples,7,31,1000.00,#10b981,t,2025-10-15 15:07:51.354723+00,2025-10-15 15:07:51.354723+00

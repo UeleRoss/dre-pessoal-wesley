@@ -1,0 +1,2 @@
+id,user_id,credit_card_id,reference_month,invoice_amount,paid,payment_date,notes,created_at,updated_at
+5e533da4-956b-4b0d-93d1-4676067d400c,a3b12ed2-9440-40d9-9293-3c20e778dd74,10afe38b-ee7b-402d-8fbd-ac1d2c9d0b68,2025-10-01,812.29,t,2025-10-15,,2025-10-15 19:07:06.907813+00,2025-10-15 19:07:06.907813+00

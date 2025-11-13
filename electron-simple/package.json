@@ -1,0 +1,29 @@
+{
+  "name": "dre-pessoal-app",
+  "version": "1.0.0",
+  "description": "DRE Pessoal - App Desktop",
+  "main": "main.js",
+  "author": "Wesley Ross",
+  "license": "MIT",
+  "build": {
+    "appId": "com.wesleyrossa.dre-pessoal",
+    "productName": "DRE Pessoal",
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "files": [
+      "main.js",
+      "../dist/**/*",
+      "../public/**/*"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "../electron-dist"
+    }
+  }
+}

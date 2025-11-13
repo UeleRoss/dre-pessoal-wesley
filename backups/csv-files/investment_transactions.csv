@@ -1,0 +1,3 @@
+id,investment_id,user_id,type,amount,bank,description,date,created_at
+8e0bbc95-ca41-483a-a2e2-a6a180c459aa,f8e32660-820b-401e-9cff-14c18ef3ea31,a3b12ed2-9440-40d9-9293-3c20e778dd74,aporte,1000,C6 BANK,,2025-08-06,2025-08-06 23:47:49.666311+00
+f0a5bfc5-3f9f-4eb5-9d8a-e81393ea807c,f8e32660-820b-401e-9cff-14c18ef3ea31,a3b12ed2-9440-40d9-9293-3c20e778dd74,aporte,500,C6 BANK,CDB c6 pós fixado 6 meses,2025-09-04,2025-09-04 13:32:21.423278+00

@@ -1,0 +1,30 @@
+{
+  "appId": "com.wesleyrossa.dre",
+  "productName": "DRE Pessoal Offline",
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "directories": {
+    "buildResources": "build",
+    "output": "release"
+  },
+  "extraResources": [
+    {
+      "from": "localdb",
+      "to": "localdb",
+      "filter": ["**/*"]
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.productivity"
+  },
+  "win": {
+    "target": "nsis"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "category": "Utility"
+  }
+}
